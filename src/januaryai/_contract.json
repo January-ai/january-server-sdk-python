@@ -1,0 +1,2810 @@
+{
+  "schemas": {
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "A developer-facing explanation of what went wrong and how to fix it.",
+          "example": "query is required: the food name to search for, e.g. ?query=greek yogurt."
+        },
+        "code": {
+          "type": "string",
+          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording. Current values: invalid_request, unauthorized, forbidden, not_found, not_implemented, payload_too_large, rate_limited, internal_error, upstream_error, service_unavailable, upstream_timeout. Only rate_limited, internal_error, upstream_error, service_unavailable, and upstream_timeout are safe to retry (with backoff) — not_implemented is permanent until the feature ships. New codes may be added over time; treat an unknown code according to its HTTP status class.",
+          "example": "invalid_request"
+        },
+        "docs_url": {
+          "type": "string",
+          "description": "Link to the developer documentation for this API version.",
+          "example": "https://docs.january.ai/nutrition/apis/v1.2/"
+        }
+      },
+      "required": [
+        "message",
+        "code",
+        "docs_url"
+      ],
+      "x-january-upstream-schema": "ApiErrorDto"
+    },
+    "NutrientAmount": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "example": 300
+        },
+        "unit": {
+          "type": "string",
+          "example": "grams"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "x-january-upstream-schema": "NutrientAmountDto"
+    },
+    "NutritionFacts": {
+      "type": "object",
+      "properties": {
+        "calories": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "protein": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "carbohydrates": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "net_carbohydrates": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "total_fat": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "trans_fat": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "saturated_fat": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "fiber": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "total_sugars": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "added_sugars": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "cholesterol": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "calcium": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "iron": {
+          "description": "Unit: mcg.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutrientAmount"
+            }
+          ]
+        },
+        "potassium": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "sodium": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "vitamin_d": {
+          "description": "Unit: IU.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutrientAmount"
+            }
+          ]
+        }
+      },
+      "x-january-upstream-schema": "NutrientsDto"
+    },
+    "ServingOption": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/ServingId"
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1
+        },
+        "unit": {
+          "type": "string",
+          "example": "oz"
+        },
+        "scaling_factor": {
+          "type": "number",
+          "description": "Multiplier applied to the food's nutrition values for this serving.",
+          "example": 1
+        },
+        "weight_grams": {
+          "type": "number",
+          "nullable": true,
+          "example": 28
+        },
+        "is_primary": {
+          "type": "boolean",
+          "description": "Whether this is the default serving for the food.",
+          "example": true
+        }
+      },
+      "required": [
+        "id",
+        "quantity",
+        "unit",
+        "scaling_factor",
+        "weight_grams",
+        "is_primary"
+      ],
+      "x-january-upstream-schema": "FoodServingDto"
+    },
+    "FoodSearchItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "name": {
+          "type": "string",
+          "example": "Dipped Banana Bites"
+        },
+        "brand_name": {
+          "type": "string",
+          "example": "Banana",
+          "description": "Absent for generic (non-branded) foods."
+        },
+        "nutrients": {
+          "description": "Per-serving nutrition in the shared nutrient vocabulary. Keys are omitted when the database has no value.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        },
+        "glycemic_index": {
+          "type": "number",
+          "description": "Glycemic index."
+        },
+        "glycemic_load": {
+          "type": "number",
+          "description": "Glycemic load."
+        },
+        "image_url": {
+          "type": "string",
+          "description": "URL of a picture of the food, when the database has one."
+        },
+        "upc": {
+          "type": "string",
+          "example": "049000006346",
+          "description": "The product's barcode, for branded foods that have one."
+        },
+        "servings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ServingOption"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "nutrients",
+        "servings"
+      ],
+      "x-january-upstream-schema": "FoodDto"
+    },
+    "FoodSearchResults": {
+      "type": "object",
+      "properties": {
+        "total_count": {
+          "type": "number",
+          "description": "Total number of matches in the database; may exceed the number of items returned.",
+          "example": 132
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodSearchItem"
+          }
+        }
+      },
+      "required": [
+        "total_count",
+        "items"
+      ],
+      "x-january-upstream-schema": "FoodSearchResponseDto"
+    },
+    "FoodSuggestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "name": {
+          "type": "string",
+          "example": "greek yogurt",
+          "description": "Generic foods are lowercase; branded foods keep their product name."
+        },
+        "brand_name": {
+          "type": "string",
+          "example": "Chobani",
+          "description": "Absent for generic (non-branded) foods."
+        },
+        "image_url": {
+          "type": "string",
+          "description": "Thumbnail of the food, when the database has one."
+        },
+        "nutrients": {
+          "description": "Calories per default serving, in the shared nutrient vocabulary — the one nutrient a suggestion carries. Fetch the food for the full panel.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "x-january-upstream-schema": "FoodSuggestionDto"
+    },
+    "AutocompleteFoodsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "Ranked suggestions, generic foods before branded. Empty when nothing matches.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodSuggestion"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "x-january-upstream-schema": "FoodSuggestionsResponseDto"
+    },
+    "SuggestFoodAlternativesBody": {
+      "type": "object",
+      "properties": {
+        "diet_restrictions": {
+          "type": "array",
+          "description": "Allergens/ingredients to avoid. Omit it (or send []) if none apply.",
+          "example": [
+            "gluten",
+            "peanuts"
+          ],
+          "items": {
+            "$ref": "#/components/schemas/DietRestriction"
+          },
+          "minItems": 1,
+          "x-january-derived-from": "/components/schemas/FoodAlternativesRequestDto/properties/diet_restrictions",
+          "x-january-overlay-id": "NORMALIZATION-017",
+          "x-january-evidence": "EVIDENCE-009"
+        },
+        "diet_preferences": {
+          "type": "array",
+          "description": "Dietary patterns to match. Omit it (or send []) if none apply.",
+          "example": [
+            "vegetarian"
+          ],
+          "items": {
+            "$ref": "#/components/schemas/DietPreference"
+          },
+          "minItems": 1,
+          "x-january-derived-from": "/components/schemas/FoodAlternativesRequestDto/properties/diet_preferences",
+          "x-january-overlay-id": "NORMALIZATION-018",
+          "x-january-evidence": "EVIDENCE-009"
+        }
+      },
+      "x-january-upstream-schema": "FoodAlternativesRequestDto"
+    },
+    "CompleteScanNutritionFacts": {
+      "type": "object",
+      "properties": {
+        "calories": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "protein": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "carbohydrates": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "net_carbohydrates": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "total_fat": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "saturated_fat": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "fiber": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "total_sugars": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "added_sugars": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        },
+        "sodium": {
+          "$ref": "#/components/schemas/NutrientAmount"
+        }
+      },
+      "description": "Nutrients reported by analysis and alternatives. Each key may be omitted when not supplied. An absent key is not a measured zero. Present amounts retain their value and unit.",
+      "x-january-upstream-schema": "MacroNutrientsDto",
+      "x-january-source-snapshot": "openapi/upstream/nutrient-schemas-v1.2.json"
+    },
+    "AlternativeServing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/ServingId"
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1
+        },
+        "unit": {
+          "type": "string",
+          "example": "cup"
+        }
+      },
+      "required": [
+        "id",
+        "unit"
+      ],
+      "x-january-upstream-schema": "ServingSummaryDto"
+    },
+    "AlternativeFood": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "name": {
+          "type": "string",
+          "example": "Oatmeal"
+        },
+        "brand_name": {
+          "type": "string",
+          "example": "",
+          "description": "Empty for generic (non-branded) foods."
+        },
+        "nutrients": {
+          "$ref": "#/components/schemas/CompleteScanNutritionFacts"
+        },
+        "servings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/AlternativeServing"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "nutrients"
+      ],
+      "x-january-upstream-schema": "AlternativeFoodDto"
+    },
+    "FoodAlternative": {
+      "type": "object",
+      "properties": {
+        "food": {
+          "$ref": "#/components/schemas/AlternativeFood"
+        }
+      },
+      "required": [
+        "food"
+      ],
+      "x-january-upstream-schema": "FoodAlternativeDto"
+    },
+    "SuggestFoodAlternativesResponse": {
+      "type": "object",
+      "properties": {
+        "alternatives": {
+          "description": "Healthier alternatives matching the restrictions and preferences. An empty array is a valid result, not an error.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodAlternative"
+          }
+        }
+      },
+      "required": [
+        "alternatives"
+      ],
+      "x-january-upstream-schema": "FoodAlternativesResponseDto"
+    },
+    "Restaurant": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "restaurant",
+            "menu_item"
+          ],
+          "description": "When coordinates are provided and the name matches no restaurant, results may be menu items instead.",
+          "example": "restaurant"
+        },
+        "id": {
+          "type": "string",
+          "example": "53fc3b8a-e6bf-404d-83c8-9f42124d1bee"
+        },
+        "name": {
+          "type": "string",
+          "example": "McDonald's"
+        },
+        "is_chain": {
+          "type": "boolean",
+          "example": false
+        },
+        "distance": {
+          "type": "number",
+          "description": "Distance from (latitude, longitude) in meters; present only when coordinates were provided.",
+          "example": 124
+        },
+        "city": {
+          "type": "string",
+          "example": "San Francisco"
+        },
+        "address1": {
+          "type": "string",
+          "example": "123 Main Street"
+        },
+        "address2": {
+          "type": "string",
+          "example": "Suite 100"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "name"
+      ],
+      "x-january-upstream-schema": "RestaurantResultDto"
+    },
+    "SearchRestaurantsResponse": {
+      "type": "object",
+      "properties": {
+        "total_count": {
+          "type": "number",
+          "description": "Total number of matches; may exceed the number of items returned.",
+          "example": 12
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/Restaurant"
+          }
+        }
+      },
+      "required": [
+        "total_count",
+        "items"
+      ],
+      "x-january-upstream-schema": "RestaurantSearchResponseDto"
+    },
+    "RestaurantMenuItem": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "example": "menu_item"
+        },
+        "id": {
+          "$ref": "#/components/schemas/RestaurantMenuItemId"
+        },
+        "name": {
+          "type": "string",
+          "example": "burger"
+        },
+        "restaurant_name": {
+          "type": "string",
+          "example": "morning due cafe"
+        },
+        "is_chain": {
+          "type": "boolean",
+          "example": false
+        },
+        "nutrients": {
+          "description": "Per-dish nutrition in the shared nutrient vocabulary. Keys are omitted when the menu source has no value.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        },
+        "glycemic_index": {
+          "type": "number",
+          "description": "Glycemic index."
+        },
+        "glycemic_load": {
+          "type": "number",
+          "description": "Glycemic load."
+        },
+        "image_url": {
+          "type": "string",
+          "description": "URL of a picture of the dish, when the source has one."
+        },
+        "distance": {
+          "type": "number",
+          "description": "Distance from (latitude, longitude) in meters.",
+          "example": 124
+        },
+        "servings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ServingOption"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "name",
+        "restaurant_name",
+        "servings"
+      ],
+      "x-january-upstream-schema": "MenuItemDto"
+    },
+    "SearchRestaurantMenuItemsResponse": {
+      "type": "object",
+      "properties": {
+        "total_count": {
+          "type": "number",
+          "description": "Total number of matches; may exceed the number of items returned.",
+          "example": 7
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/RestaurantMenuItem"
+          }
+        }
+      },
+      "required": [
+        "total_count",
+        "items"
+      ],
+      "x-january-upstream-schema": "MenuSearchResponseDto"
+    },
+    "ScanFoodPhotoBody": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "The meal photo, as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Any image of the meal works — a camera photo, a screenshot, or a hosted picture. Formats: JPG, PNG, WEBP, and non-animated GIF. A URL must be publicly fetchable server-side: hosts that block hotlinking or require a login cannot be read. Prefer the URL when the image is already hosted — base64 inflates the payload by ~33%, and request bodies over 5 MB are rejected, so keep raw images under ~3.5 MB when encoding.",
+          "example": "https://i.imgur.com/bTQIGxf.png"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "x-january-upstream-schema": "ScanPhotoDto"
+    },
+    "DetectedServing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/ServingId"
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1
+        },
+        "unit": {
+          "type": "string",
+          "example": "cup"
+        },
+        "selected_quantity": {
+          "type": "number",
+          "description": "Quantity the parser selected from the text ('2 cups' → 2); text scans only. Advisory — corrections reads the serving's own quantity.",
+          "example": 1
+        }
+      },
+      "required": [
+        "id",
+        "unit"
+      ],
+      "x-january-upstream-schema": "DetectionServingDto"
+    },
+    "DetectedFood": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "name": {
+          "type": "string",
+          "example": "Oatmeal"
+        },
+        "brand_name": {
+          "type": "string",
+          "example": "",
+          "description": "Empty for generic (non-branded) foods."
+        },
+        "nutrients": {
+          "$ref": "#/components/schemas/CompleteScanNutritionFacts"
+        },
+        "servings": {
+          "description": "Never empty: every detection producer guarantees at least one serving.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DetectedServing"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "nutrients",
+        "servings"
+      ],
+      "x-january-upstream-schema": "DetectionFoodDto"
+    },
+    "FoodDetection": {
+      "type": "object",
+      "properties": {
+        "confidence_score": {
+          "$ref": "#/components/schemas/ConfidenceScore"
+        },
+        "food": {
+          "$ref": "#/components/schemas/DetectedFood"
+        }
+      },
+      "required": [
+        "food"
+      ],
+      "x-january-upstream-schema": "DetectionDto"
+    },
+    "FoodScan": {
+      "type": "object",
+      "properties": {
+        "meal_name": {
+          "type": "string",
+          "example": "Breakfast Bowl"
+        },
+        "total_nutrients": {
+          "description": "Aggregated nutrition across all detections.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/CompleteScanNutritionFacts"
+            }
+          ]
+        },
+        "detections": {
+          "description": "Detected foods. Always present — an empty array means nothing was recognized.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodDetection"
+          }
+        }
+      },
+      "required": [
+        "detections"
+      ],
+      "x-january-upstream-schema": "ScanResultDto"
+    },
+    "SearchFoodsByNaturalLanguageBody": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Natural-language description of what was eaten; parsed into detected foods with quantities.",
+          "example": "a bowl of oatmeal with honey and a banana",
+          "maxLength": 512
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "x-january-upstream-schema": "ScanTextDto"
+    },
+    "CorrectPhotoScanBody": {
+      "type": "object",
+      "properties": {
+        "meal_name": {
+          "type": "string",
+          "description": "The meal name from the scan, when it returned one (photo scans do; text scans don't). Defaults to 'Meal'.",
+          "example": "Breakfast Bowl"
+        },
+        "detections": {
+          "description": "The detections array from a photo or text food scan, exactly as returned. Omitted zero-value nutrient keys are filled in automatically; each detection needs at least one serving.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodDetection"
+          }
+        },
+        "user_input": {
+          "type": "string",
+          "description": "Plain-English description of what to correct.",
+          "example": "The oatmeal was steel-cut, about 2 cups, and there was no honey."
+        }
+      },
+      "required": [
+        "detections",
+        "user_input"
+      ],
+      "x-january-upstream-schema": "CorrectScanDto"
+    },
+    "FoodLogInputServing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/ServingId"
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1.4,
+          "description": "How many of that serving were consumed.",
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "id",
+        "quantity"
+      ],
+      "x-january-upstream-schema": "ServingSelectionDto"
+    },
+    "FoodLogInputFood": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "serving": {
+          "$ref": "#/components/schemas/FoodLogInputServing"
+        }
+      },
+      "required": [
+        "id",
+        "serving"
+      ],
+      "x-january-upstream-schema": "FoodSelectionDto"
+    },
+    "CreateFoodLogBody": {
+      "type": "object",
+      "properties": {
+        "foods": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodLogInputFood"
+          }
+        },
+        "timestamp_utc": {
+          "type": "string",
+          "example": "2024-09-13T11:34:56Z",
+          "format": "date-time",
+          "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC. Omitted = now."
+        },
+        "name": {
+          "type": "string",
+          "example": "Breakfast",
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "foods"
+      ],
+      "x-january-upstream-schema": "CreateFoodLogDto"
+    },
+    "ServingDetails": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/ServingId"
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1
+        },
+        "unit": {
+          "type": "string",
+          "example": "cup"
+        },
+        "weight_grams": {
+          "type": "number",
+          "nullable": true,
+          "example": 245
+        }
+      },
+      "required": [
+        "id",
+        "quantity",
+        "unit"
+      ],
+      "x-january-upstream-schema": "ServingDetailsDto"
+    },
+    "LoggedFood": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "name": {
+          "type": "string",
+          "example": "Greek Yogurt, Plain, Whole Milk"
+        },
+        "brand_name": {
+          "type": "string",
+          "nullable": true
+        },
+        "image_url": {
+          "type": "string",
+          "nullable": true
+        },
+        "glycemic_index": {
+          "type": "number",
+          "nullable": true,
+          "example": 11.3
+        },
+        "glycemic_load": {
+          "type": "number",
+          "nullable": true,
+          "example": 1.4
+        },
+        "nutrients": {
+          "description": "Scaled to the consumed serving.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        },
+        "consumed_serving": {
+          "description": "What was logged.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/FoodLogInputServing"
+            }
+          ]
+        },
+        "serving_details": {
+          "description": "The serving definition the quantity refers to.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/ServingDetails"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "nutrients",
+        "consumed_serving",
+        "serving_details"
+      ],
+      "x-january-upstream-schema": "LoggedFoodDto"
+    },
+    "FoodLog": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/FoodLogId"
+        },
+        "foods": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/LoggedFood"
+          }
+        },
+        "timestamp_utc": {
+          "type": "string",
+          "example": "2024-09-13T11:34:56Z",
+          "format": "january-api-timestamp",
+          "description": "Returned UTC timestamp. Treat as an opaque string because deployed responses are not consistently RFC 3339 formatted.",
+          "x-january-derived-from": "/components/schemas/FoodLogDto/properties/timestamp_utc",
+          "x-january-overlay-id": "NORMALIZATION-063"
+        },
+        "name": {
+          "type": "string",
+          "nullable": true,
+          "example": "Breakfast"
+        }
+      },
+      "required": [
+        "id",
+        "foods",
+        "timestamp_utc"
+      ],
+      "x-january-upstream-schema": "FoodLogDto"
+    },
+    "ListFoodLogsResponse": {
+      "type": "object",
+      "properties": {
+        "total_count": {
+          "type": "number",
+          "example": 3
+        },
+        "items": {
+          "description": "Logs in the range, ordered by timestamp. An empty list is a valid result.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodLog"
+          }
+        }
+      },
+      "required": [
+        "total_count",
+        "items"
+      ],
+      "x-january-upstream-schema": "FoodLogListResponseDto"
+    },
+    "UpdateFoodLogBody": {
+      "type": "object",
+      "properties": {
+        "foods": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodLogInputFood"
+          }
+        },
+        "timestamp_utc": {
+          "type": "string",
+          "example": "2024-09-13T11:34:56Z",
+          "description": "UTC consumption time, ending in Z."
+        },
+        "name": {
+          "type": "string",
+          "example": "Breakfast",
+          "maxLength": 256
+        }
+      },
+      "x-january-upstream-schema": "UpdateFoodLogDto"
+    },
+    "DeleteFoodLogResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "example": "deleted",
+          "description": "Deletion is idempotent — an unknown or already-deleted log_id returns the same response."
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "x-january-upstream-schema": "DeleteFoodLogResponseDto"
+    },
+    "Height": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "example": 66
+        },
+        "unit": {
+          "$ref": "#/components/schemas/HeightUnit"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "x-january-upstream-schema": "HeightDto"
+    },
+    "Weight": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "example": 150
+        },
+        "unit": {
+          "$ref": "#/components/schemas/WeightUnit"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "x-january-upstream-schema": "WeightDto"
+    },
+    "GlucosePredictionProfile": {
+      "type": "object",
+      "properties": {
+        "age": {
+          "type": "number",
+          "example": 42
+        },
+        "sex": {
+          "$ref": "#/components/schemas/Sex"
+        },
+        "height": {
+          "$ref": "#/components/schemas/Height"
+        },
+        "weight": {
+          "$ref": "#/components/schemas/Weight"
+        },
+        "activity_level": {
+          "$ref": "#/components/schemas/ActivityLevel"
+        },
+        "health_conditions": {
+          "type": "array",
+          "example": [
+            "prediabetes"
+          ],
+          "description": "Omit it (or send []) if none apply. Type 1 diabetes is not supported by the prediction model.",
+          "items": {
+            "$ref": "#/components/schemas/MedicalCondition"
+          }
+        }
+      },
+      "required": [
+        "age",
+        "sex",
+        "height",
+        "weight"
+      ],
+      "x-january-upstream-schema": "GlucoseUserProfileDto"
+    },
+    "CgmReading": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "example": "2024-09-10T08:15:00Z",
+          "format": "date-time"
+        },
+        "value": {
+          "type": "number",
+          "example": 104,
+          "description": "mg/dL. At most one reading per 15-minute window."
+        }
+      },
+      "required": [
+        "timestamp",
+        "value"
+      ],
+      "x-january-upstream-schema": "CgmReadingDto"
+    },
+    "ConsumedHistoricalFood": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "example": "2024-09-10T08:00:00Z",
+          "format": "date-time"
+        },
+        "id": {
+          "$ref": "#/components/schemas/FoodId"
+        },
+        "serving": {
+          "$ref": "#/components/schemas/FoodLogInputServing"
+        }
+      },
+      "required": [
+        "timestamp",
+        "id",
+        "serving"
+      ],
+      "x-january-upstream-schema": "ConsumedFoodEntryDto"
+    },
+    "PredictGlucoseBody": {
+      "type": "object",
+      "properties": {
+        "user_profile": {
+          "$ref": "#/components/schemas/GlucosePredictionProfile"
+        },
+        "foods": {
+          "description": "The meal to predict the glucose response for.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodLogInputFood"
+          }
+        },
+        "start_time": {
+          "type": "string",
+          "example": "2024-09-13T11:34:56Z",
+          "format": "date-time",
+          "description": "When the meal is (or will be) eaten. Must carry a timezone designator.",
+          "x-january-derived-from": "/components/schemas/GlucosePredictDto/properties/start_time",
+          "x-january-overlay-id": "NORMALIZATION-019",
+          "x-january-evidence": "EVIDENCE-009"
+        },
+        "cgm_data": {
+          "description": "Optional CGM history for personalization; requires consumed_foods.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/CgmReading"
+          }
+        },
+        "consumed_foods": {
+          "description": "The meals eaten during the CGM history; requires cgm_data.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ConsumedHistoricalFood"
+          }
+        }
+      },
+      "required": [
+        "user_profile",
+        "foods",
+        "start_time"
+      ],
+      "x-january-upstream-schema": "GlucosePredictDto"
+    },
+    "GlucosePredictionPoint": {
+      "type": "object",
+      "properties": {
+        "minutes": {
+          "type": "number",
+          "example": 30,
+          "description": "Minutes after start_time."
+        },
+        "value": {
+          "type": "number",
+          "example": 140,
+          "description": "Predicted glucose, mg/dL."
+        }
+      },
+      "required": [
+        "minutes",
+        "value"
+      ],
+      "x-january-upstream-schema": "GlucosePredictionPointDto"
+    },
+    "GlucoseChart": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "number",
+          "example": 70,
+          "description": "Suggested Y-axis lower bound (mg/dL). A fixed target-range bound, not the minimum of the curve."
+        },
+        "max": {
+          "type": "number",
+          "example": 140,
+          "description": "Suggested Y-axis upper bound (mg/dL): 180 with Type 2 diabetes in health_conditions, otherwise 140. Not the maximum of the curve."
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "x-january-upstream-schema": "GlucoseChartDto"
+    },
+    "GlucosePrediction": {
+      "type": "object",
+      "properties": {
+        "prediction": {
+          "description": "The predicted glucose curve at 15-minute intervals, starting at start_time.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/GlucosePredictionPoint"
+          }
+        },
+        "impact_score": {
+          "$ref": "#/components/schemas/GlucoseImpact"
+        },
+        "chart": {
+          "$ref": "#/components/schemas/GlucoseChart"
+        }
+      },
+      "required": [
+        "prediction",
+        "impact_score",
+        "chart"
+      ],
+      "x-january-upstream-schema": "GlucosePredictionResponseDto"
+    },
+    "FoodId": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "example": 84222716,
+      "description": "Stable food identifier, provisionally narrowed to JavaScript's safe integer range.",
+      "x-january-derived-from": [
+        "/components/schemas/FoodDto/properties/id",
+        "/components/schemas/FoodSuggestionDto/properties/id",
+        "/components/schemas/AlternativeFoodDto/properties/id",
+        "/components/schemas/DetectionFoodDto/properties/id",
+        "/components/schemas/FoodSelectionDto/properties/id",
+        "/components/schemas/LoggedFoodDto/properties/id",
+        "/components/schemas/ConsumedFoodEntryDto/properties/id",
+        "/paths/~1v1.2~1foods~1{food_id}/get/parameters/1/schema",
+        "/paths/~1v1.2~1foods~1{food_id}~1alternatives/post/parameters/1/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-002",
+      "x-january-evidence": "EVIDENCE-001"
+    },
+    "ServingId": {
+      "type": "integer",
+      "format": "int64",
+      "minimum": 0,
+      "maximum": 9007199254740991,
+      "example": 496145,
+      "description": "Stable serving identifier, provisionally narrowed to JavaScript's safe integer range.",
+      "x-january-derived-from": [
+        "/components/schemas/FoodServingDto/properties/id",
+        "/components/schemas/ServingSummaryDto/properties/id",
+        "/components/schemas/DetectionServingDto/properties/id",
+        "/components/schemas/ServingSelectionDto/properties/id",
+        "/components/schemas/ServingDetailsDto/properties/id"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-003",
+      "x-january-evidence": "EVIDENCE-001"
+    },
+    "FoodLogId": {
+      "type": "string",
+      "format": "uuid",
+      "example": "78129823-8ba2-4183-b13b-71f0e963c606",
+      "description": "Stable food-log identifier; the upstream 400 response explicitly rejects non-UUID values.",
+      "x-january-derived-from": [
+        "/components/schemas/FoodLogDto/properties/id",
+        "/paths/~1v1.2~1food-logs~1{log_id}/patch/parameters/2/schema",
+        "/paths/~1v1.2~1food-logs~1{log_id}/delete/parameters/2/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-004",
+      "x-january-evidence": "EVIDENCE-006"
+    },
+    "PartnerUserId": {
+      "type": "string",
+      "format": "opaque",
+      "minLength": 1,
+      "description": "Stable partner-owned identifier of the end user for whom a request is made.",
+      "x-january-derived-from": [
+        "/paths/~1v1.2~1foods~1autocomplete/get/parameters/0/schema",
+        "/paths/~1v1.2~1foods~1{food_id}/get/parameters/0/schema",
+        "/paths/~1v1.2~1foods/get/parameters/0/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-005"
+    },
+    "RestaurantMenuItemId": {
+      "type": "string",
+      "format": "opaque",
+      "minLength": 1,
+      "example": "228990954",
+      "description": "Opaque restaurant menu-item identifier.",
+      "x-january-derived-from": [
+        "/components/schemas/MenuItemDto/properties/id"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-006",
+      "x-january-evidence": "EVIDENCE-006"
+    },
+    "Barcode": {
+      "type": "string",
+      "pattern": "^[0-9]{6,14}$",
+      "example": "049000006346",
+      "description": "A 6-to-14-digit UPC, EAN, or GTIN barcode; represented as a string to preserve leading zeroes.",
+      "x-january-derived-from": [
+        "/paths/~1v1.2~1foods~1barcode~1{upc}/get/parameters/1/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-007",
+      "x-january-evidence": "EVIDENCE-008"
+    },
+    "FoodCategory": {
+      "default": "general",
+      "enum": [
+        "general",
+        "branded",
+        "recipe"
+      ],
+      "type": "string",
+      "x-january-derived-from": [
+        "/paths/~1v1.2~1foods/get/parameters/2/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-008"
+    },
+    "AutocompleteFoodCategory": {
+      "enum": [
+        "general",
+        "branded"
+      ],
+      "type": "string",
+      "x-january-derived-from": [
+        "/paths/~1v1.2~1foods~1autocomplete/get/parameters/2/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-064"
+    },
+    "DietRestriction": {
+      "type": "string",
+      "enum": [
+        "gluten",
+        "lactose",
+        "yeast",
+        "tree_nuts",
+        "peanuts",
+        "dairy",
+        "eggs",
+        "sulfites",
+        "soy",
+        "wheat",
+        "shellfish",
+        "fish",
+        "mushrooms",
+        "sesame",
+        "msg",
+        "caffeine",
+        "fodmaps"
+      ],
+      "x-january-derived-from": [
+        "/components/schemas/FoodAlternativesRequestDto/properties/diet_restrictions/items"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-009"
+    },
+    "DietPreference": {
+      "type": "string",
+      "enum": [
+        "vegetarian",
+        "vegan",
+        "keto",
+        "paleo",
+        "pescatarian",
+        "low_carbohydrate",
+        "high_protein",
+        "kosher",
+        "halal"
+      ],
+      "x-january-derived-from": [
+        "/components/schemas/FoodAlternativesRequestDto/properties/diet_preferences/items"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-010"
+    },
+    "ConfidenceScore": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "example": "high",
+      "description": "Photo scans only; absent on text scans.",
+      "x-january-derived-from": [
+        "/components/schemas/DetectionDto/properties/confidence_score"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-011"
+    },
+    "Sex": {
+      "type": "string",
+      "enum": [
+        "male",
+        "female"
+      ],
+      "example": "female",
+      "description": "Biological sex, as consumed by the prediction model.",
+      "x-january-derived-from": [
+        "/components/schemas/GlucoseUserProfileDto/properties/sex"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-012"
+    },
+    "ActivityLevel": {
+      "type": "string",
+      "enum": [
+        "sedentary",
+        "lightly_active",
+        "moderately_active",
+        "very_active"
+      ],
+      "x-january-derived-from": [
+        "/components/schemas/GlucoseUserProfileDto/properties/activity_level"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-013"
+    },
+    "MedicalCondition": {
+      "type": "string",
+      "enum": [
+        "type_2_diabetes",
+        "prediabetes"
+      ],
+      "x-january-derived-from": [
+        "/components/schemas/GlucoseUserProfileDto/properties/health_conditions/items"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-014"
+    },
+    "GlucoseImpact": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "example": "low",
+      "description": "The meal's overall glucose impact.",
+      "x-january-derived-from": [
+        "/components/schemas/GlucosePredictionResponseDto/properties/impact_score"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-015"
+    },
+    "HeightUnit": {
+      "type": "string",
+      "enum": [
+        "in",
+        "cm"
+      ],
+      "example": "in",
+      "x-january-derived-from": [
+        "/components/schemas/HeightDto/properties/unit"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-016"
+    },
+    "WeightUnit": {
+      "type": "string",
+      "enum": [
+        "lb",
+        "kg"
+      ],
+      "example": "lb",
+      "x-january-derived-from": [
+        "/components/schemas/WeightDto/properties/unit"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-062"
+    },
+    "ApiErrorDto": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "A developer-facing explanation of what went wrong and how to fix it.",
+          "example": "query is required: the food name to search for, e.g. ?query=greek yogurt."
+        },
+        "code": {
+          "type": "string",
+          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording. Current values: invalid_request, unauthorized, forbidden, not_found, not_implemented, payload_too_large, rate_limited, internal_error, upstream_error, service_unavailable, upstream_timeout. Only rate_limited, internal_error, upstream_error, service_unavailable, and upstream_timeout are safe to retry (with backoff) — not_implemented is permanent until the feature ships. New codes may be added over time; treat an unknown code according to its HTTP status class.",
+          "example": "invalid_request"
+        },
+        "docs_url": {
+          "type": "string",
+          "description": "Link to the developer documentation.",
+          "example": "https://docs.january.ai/rest-api/api-overview"
+        }
+      },
+      "required": [
+        "message",
+        "code",
+        "docs_url"
+      ]
+    },
+    "ClientTokenResponseDto": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "The credential itself. Shown exactly once — it is stored only as a hash and can never be retrieved again.",
+          "example": "ct-4fQr7yNb2KcXm9TvLpZ3wHs6JdRg8AeYuQ1oViB5xCn"
+        },
+        "expires_in": {
+          "type": "number",
+          "description": "Seconds until the token expires, counted from the moment this response was produced. Compute expiry from this rather than from `expires_at` — a device clock that is wrong makes an absolute timestamp wrong with it.",
+          "example": 1800
+        },
+        "expires_at": {
+          "type": "string",
+          "description": "The same expiry as an absolute UTC instant, for logs and humans.",
+          "example": "2026-08-26T18:35:11.000Z"
+        },
+        "end_user_id": {
+          "type": "string",
+          "description": "The end user this token is bound to, echoed back so a caller can assert it minted what it meant to.",
+          "example": "acme-user-8271"
+        },
+        "scopes": {
+          "type": "array",
+          "description": "What this token may do — the scopes granted, whether requested explicitly or defaulted.",
+          "example": [
+            "foods:read",
+            "food_scans:write",
+            "food_logs:read",
+            "food_logs:write",
+            "glucose:read",
+            "restaurants:read"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "foods:read",
+              "food_scans:write",
+              "food_logs:read",
+              "food_logs:write",
+              "glucose:read",
+              "restaurants:read"
+            ]
+          }
+        }
+      },
+      "required": [
+        "token",
+        "expires_in",
+        "expires_at",
+        "end_user_id",
+        "scopes"
+      ]
+    },
+    "CreateClientTokenDto": {
+      "type": "object",
+      "properties": {
+        "end_user_id": {
+          "type": "string",
+          "description": "Your stable ID for the end user this token acts as. The token is bound to it; requests made with the token act only on this user.",
+          "example": "acme-user-8271",
+          "maxLength": 64
+        },
+        "scopes": {
+          "type": "array",
+          "description": "What the token may do. Omit to grant the full client-grantable set (foods:read, food_scans:write, food_logs:read, food_logs:write, glucose:read, restaurants:read). Grant only what the screen needs.",
+          "example": [
+            "foods:read",
+            "food_scans:write",
+            "food_logs:read",
+            "food_logs:write",
+            "glucose:read",
+            "restaurants:read"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "foods:read",
+              "food_scans:write",
+              "food_logs:read",
+              "food_logs:write",
+              "glucose:read",
+              "restaurants:read"
+            ]
+          }
+        },
+        "ttl_seconds": {
+          "type": "number",
+          "description": "How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.",
+          "minimum": 300,
+          "maximum": 7200,
+          "default": 1800,
+          "example": 1800
+        }
+      },
+      "required": [
+        "end_user_id"
+      ]
+    },
+    "CreditsResponseDto": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "string",
+          "description": "The plan this allowance comes from.",
+          "example": "free"
+        },
+        "period_start": {
+          "type": "string",
+          "description": "First day of the current billing period (UTC), inclusive.",
+          "example": "2026-08-01"
+        },
+        "period_end": {
+          "type": "string",
+          "description": "Last day of the current billing period (UTC), inclusive.",
+          "example": "2026-08-31"
+        },
+        "resets_at": {
+          "type": "string",
+          "description": "When the allowance resets and `used_credits` returns to 0.",
+          "example": "2026-09-01T00:00:00.000Z"
+        },
+        "included_credits": {
+          "type": "number",
+          "description": "Credits included in the plan for this period. Absent when the plan has no ceiling.",
+          "example": 1000
+        },
+        "used_credits": {
+          "type": "number",
+          "description": "Credits used so far this period. One successful v1.2 API call costs 1 credit; failed calls cost nothing.",
+          "example": 342
+        },
+        "remaining_credits": {
+          "type": "number",
+          "description": "Credits left in this period. Absent when the plan has no ceiling.",
+          "example": 658
+        }
+      },
+      "required": [
+        "plan",
+        "period_start",
+        "period_end",
+        "resets_at",
+        "used_credits"
+      ]
+    }
+  },
+  "operations": {
+    "searchFoods": {
+      "operationId": "searchFoods",
+      "method": "GET",
+      "path": "/v1.2/foods",
+      "resource": "foods",
+      "publicMethod": "search",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "query",
+          "required": true,
+          "in": "query",
+          "description": "The food name to search for.",
+          "schema": {
+            "maxLength": 256,
+            "example": "greek yogurt",
+            "type": "string"
+          },
+          "publicName": "query"
+        },
+        {
+          "name": "category",
+          "required": false,
+          "in": "query",
+          "description": "Narrows results to one food category.",
+          "schema": {
+            "$ref": "#/components/schemas/FoodCategory"
+          },
+          "publicName": "category"
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "in": "query",
+          "description": "Maximum number of results to return.",
+          "schema": {
+            "minimum": 1,
+            "maximum": 40,
+            "default": 10,
+            "type": "number"
+          },
+          "publicName": "limit"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodSearchResults"
+        }
+      },
+      "responseType": "FoodSearchResults"
+    },
+    "autocompleteFoods": {
+      "operationId": "autocompleteFoods",
+      "method": "GET",
+      "path": "/v1.2/foods/autocomplete",
+      "resource": "foods",
+      "publicMethod": "autocomplete",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "query",
+          "required": true,
+          "in": "query",
+          "description": "The characters the user has typed so far. Fewer than 2 letters or digits yield no suggestions.",
+          "schema": {
+            "maxLength": 64,
+            "example": "ban",
+            "type": "string"
+          },
+          "publicName": "query"
+        },
+        {
+          "name": "category",
+          "required": false,
+          "in": "query",
+          "description": "Narrows suggestions to one category. Omitted, generic and branded foods are suggested together, generic first.",
+          "schema": {
+            "$ref": "#/components/schemas/AutocompleteFoodCategory"
+          },
+          "publicName": "category"
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "in": "query",
+          "description": "Maximum number of suggestions to return.",
+          "schema": {
+            "minimum": 1,
+            "maximum": 20,
+            "default": 8,
+            "type": "number"
+          },
+          "publicName": "limit"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/AutocompleteFoodsResponse"
+        }
+      },
+      "responseType": "AutocompleteFoodsResponse"
+    },
+    "suggestFoodAlternatives": {
+      "operationId": "suggestFoodAlternatives",
+      "method": "POST",
+      "path": "/v1.2/foods/{food_id}/alternatives",
+      "resource": "foods",
+      "publicMethod": "suggestAlternatives",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "food_id",
+          "required": true,
+          "in": "path",
+          "description": "Numeric food id from a search, scan, or detection result. The example is brown rice.",
+          "schema": {
+            "$ref": "#/components/schemas/FoodId"
+          },
+          "publicName": "food_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "diet_restrictions",
+          "publicName": "diet_restrictions",
+          "schema": {
+            "type": "array",
+            "description": "Allergens/ingredients to avoid. Omit it (or send []) if none apply.",
+            "example": [
+              "gluten",
+              "peanuts"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DietRestriction"
+            },
+            "minItems": 1,
+            "x-january-derived-from": "/components/schemas/FoodAlternativesRequestDto/properties/diet_restrictions",
+            "x-january-overlay-id": "NORMALIZATION-017",
+            "x-january-evidence": "EVIDENCE-009"
+          },
+          "required": false
+        },
+        {
+          "name": "diet_preferences",
+          "publicName": "diet_preferences",
+          "schema": {
+            "type": "array",
+            "description": "Dietary patterns to match. Omit it (or send []) if none apply.",
+            "example": [
+              "vegetarian"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DietPreference"
+            },
+            "minItems": 1,
+            "x-january-derived-from": "/components/schemas/FoodAlternativesRequestDto/properties/diet_preferences",
+            "x-january-overlay-id": "NORMALIZATION-018",
+            "x-january-evidence": "EVIDENCE-009"
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/SuggestFoodAlternativesBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/SuggestFoodAlternativesResponse"
+        }
+      },
+      "responseType": "SuggestFoodAlternativesResponse"
+    },
+    "lookupFoodByBarcode": {
+      "operationId": "lookupFoodByBarcode",
+      "method": "GET",
+      "path": "/v1.2/foods/barcode/{upc}",
+      "resource": "foods",
+      "publicMethod": "lookupBarcode",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "upc",
+          "required": true,
+          "in": "path",
+          "description": "The numeric barcode: 6 to 14 digits (UPC-E, UPC-A, EAN-8, EAN-13 or GTIN-14). The example is a Coca-Cola can.",
+          "schema": {
+            "$ref": "#/components/schemas/Barcode"
+          },
+          "publicName": "upc"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodSearchResults"
+        }
+      },
+      "responseType": "FoodSearchResults"
+    },
+    "getFood": {
+      "operationId": "getFood",
+      "method": "GET",
+      "path": "/v1.2/foods/{food_id}",
+      "resource": "foods",
+      "publicMethod": "get",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "food_id",
+          "required": true,
+          "in": "path",
+          "description": "Numeric food id from a search, scan, or detection result.",
+          "schema": {
+            "$ref": "#/components/schemas/FoodId"
+          },
+          "publicName": "food_id"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodSearchItem"
+        }
+      },
+      "responseType": "FoodSearchItem"
+    },
+    "searchRestaurants": {
+      "operationId": "searchRestaurants",
+      "method": "GET",
+      "path": "/v1.2/restaurants",
+      "resource": "restaurants",
+      "publicMethod": "search",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "radius",
+          "required": false,
+          "in": "query",
+          "description": "Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).",
+          "schema": {
+            "minimum": 1,
+            "maximum": 17000,
+            "default": 8000,
+            "example": 5000,
+            "type": "number"
+          },
+          "publicName": "radius"
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "in": "query",
+          "description": "Maximum number of results to return.",
+          "schema": {
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10,
+            "type": "number"
+          },
+          "publicName": "limit"
+        },
+        {
+          "name": "query",
+          "required": true,
+          "in": "query",
+          "description": "Restaurant name to search for.",
+          "schema": {
+            "maxLength": 256,
+            "example": "sweetgreen",
+            "type": "string"
+          },
+          "publicName": "query"
+        },
+        {
+          "name": "latitude",
+          "required": true,
+          "in": "query",
+          "description": "Latitude of the search location, e.g. 37.7749 (San Francisco).",
+          "schema": {
+            "minimum": -90,
+            "maximum": 90,
+            "example": 37.7749,
+            "type": "number"
+          },
+          "publicName": "latitude"
+        },
+        {
+          "name": "longitude",
+          "required": true,
+          "in": "query",
+          "description": "Longitude of the search location, e.g. -122.4194 (San Francisco).",
+          "schema": {
+            "minimum": -180,
+            "maximum": 180,
+            "example": -122.4194,
+            "type": "number"
+          },
+          "publicName": "longitude"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/SearchRestaurantsResponse"
+        }
+      },
+      "responseType": "SearchRestaurantsResponse"
+    },
+    "searchRestaurantMenuItems": {
+      "operationId": "searchRestaurantMenuItems",
+      "method": "GET",
+      "path": "/v1.2/restaurants/menu-items",
+      "resource": "restaurants",
+      "publicMethod": "searchMenuItems",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "radius",
+          "required": false,
+          "in": "query",
+          "description": "Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).",
+          "schema": {
+            "minimum": 1,
+            "maximum": 17000,
+            "default": 8000,
+            "example": 5000,
+            "type": "number"
+          },
+          "publicName": "radius"
+        },
+        {
+          "name": "limit",
+          "required": false,
+          "in": "query",
+          "description": "Maximum number of results to return.",
+          "schema": {
+            "minimum": 1,
+            "maximum": 100,
+            "default": 10,
+            "type": "number"
+          },
+          "publicName": "limit"
+        },
+        {
+          "name": "query",
+          "required": true,
+          "in": "query",
+          "description": "Dish or restaurant name to search for.",
+          "schema": {
+            "maxLength": 256,
+            "example": "burger",
+            "type": "string"
+          },
+          "publicName": "query"
+        },
+        {
+          "name": "latitude",
+          "required": true,
+          "in": "query",
+          "description": "Latitude of the search location, e.g. 37.7749 (San Francisco).",
+          "schema": {
+            "minimum": -90,
+            "maximum": 90,
+            "example": 37.7749,
+            "type": "number"
+          },
+          "publicName": "latitude"
+        },
+        {
+          "name": "longitude",
+          "required": true,
+          "in": "query",
+          "description": "Longitude of the search location, e.g. -122.4194 (San Francisco).",
+          "schema": {
+            "minimum": -180,
+            "maximum": 180,
+            "example": -122.4194,
+            "type": "number"
+          },
+          "publicName": "longitude"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/SearchRestaurantMenuItemsResponse"
+        }
+      },
+      "responseType": "SearchRestaurantMenuItemsResponse"
+    },
+    "scanFoodPhoto": {
+      "operationId": "scanFoodPhoto",
+      "method": "POST",
+      "path": "/v1.2/food-scans/photo",
+      "resource": "foodAnalysis",
+      "publicMethod": "analyzePhoto",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "image",
+          "publicName": "image",
+          "schema": {
+            "type": "string",
+            "description": "The meal photo, as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Any image of the meal works — a camera photo, a screenshot, or a hosted picture. Formats: JPG, PNG, WEBP, and non-animated GIF. A URL must be publicly fetchable server-side: hosts that block hotlinking or require a login cannot be read. Prefer the URL when the image is already hosted — base64 inflates the payload by ~33%, and request bodies over 5 MB are rejected, so keep raw images under ~3.5 MB when encoding.",
+            "example": "https://i.imgur.com/bTQIGxf.png"
+          },
+          "required": true
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/ScanFoodPhotoBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodScan"
+        }
+      },
+      "responseType": "FoodScan"
+    },
+    "searchFoodsByNaturalLanguage": {
+      "operationId": "searchFoodsByNaturalLanguage",
+      "method": "POST",
+      "path": "/v1.2/food-scans/text",
+      "resource": "foodAnalysis",
+      "publicMethod": "analyzeDescription",
+      "bodyPropertyNames": {
+        "text": "query"
+      },
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "text",
+          "publicName": "query",
+          "schema": {
+            "type": "string",
+            "description": "Natural-language description of what was eaten; parsed into detected foods with quantities.",
+            "example": "a bowl of oatmeal with honey and a banana",
+            "maxLength": 512
+          },
+          "required": true
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/SearchFoodsByNaturalLanguageBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodScan"
+        }
+      },
+      "responseType": "FoodScan"
+    },
+    "correctPhotoScan": {
+      "operationId": "correctPhotoScan",
+      "method": "POST",
+      "path": "/v1.2/food-scans/corrections",
+      "resource": "foodAnalysis",
+      "publicMethod": "correct",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "meal_name",
+          "publicName": "meal_name",
+          "schema": {
+            "type": "string",
+            "description": "The meal name from the scan, when it returned one (photo scans do; text scans don't). Defaults to 'Meal'.",
+            "example": "Breakfast Bowl"
+          },
+          "required": false
+        },
+        {
+          "name": "detections",
+          "publicName": "detections",
+          "schema": {
+            "description": "The detections array from a photo or text food scan, exactly as returned. Omitted zero-value nutrient keys are filled in automatically; each detection needs at least one serving.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoodDetection"
+            }
+          },
+          "required": true
+        },
+        {
+          "name": "user_input",
+          "publicName": "user_input",
+          "schema": {
+            "type": "string",
+            "description": "Plain-English description of what to correct.",
+            "example": "The oatmeal was steel-cut, about 2 cups, and there was no honey."
+          },
+          "required": true
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/CorrectPhotoScanBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodScan"
+        }
+      },
+      "responseType": "FoodScan"
+    },
+    "createFoodLog": {
+      "operationId": "createFoodLog",
+      "method": "POST",
+      "path": "/v1.2/food-logs",
+      "resource": "foodLogs",
+      "publicMethod": "create",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Your stable ID for the end user this request acts on — the data is per-user. Opaque to January; use the same ID your system already uses.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "x-end-user-timezone",
+          "in": "header",
+          "description": "Optional: the end user's IANA timezone, forwarded upstream for local-day date handling.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_timezone"
+        }
+      ],
+      "fields": [
+        {
+          "name": "foods",
+          "publicName": "foods",
+          "schema": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoodLogInputFood"
+            }
+          },
+          "required": true
+        },
+        {
+          "name": "timestamp_utc",
+          "publicName": "timestamp_utc",
+          "schema": {
+            "type": "string",
+            "example": "2024-09-13T11:34:56Z",
+            "format": "date-time",
+            "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC. Omitted = now."
+          },
+          "required": false
+        },
+        {
+          "name": "name",
+          "publicName": "name",
+          "schema": {
+            "type": "string",
+            "example": "Breakfast",
+            "maxLength": 256
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/CreateFoodLogBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodLog"
+        }
+      },
+      "responseType": "FoodLog"
+    },
+    "listFoodLogs": {
+      "operationId": "listFoodLogs",
+      "method": "GET",
+      "path": "/v1.2/food-logs",
+      "resource": "foodLogs",
+      "publicMethod": "list",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Your stable ID for the end user this request acts on — the data is per-user. Opaque to January; use the same ID your system already uses.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "x-end-user-timezone",
+          "in": "header",
+          "description": "Optional: the end user's IANA timezone, forwarded upstream for local-day date handling.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_timezone"
+        },
+        {
+          "name": "start",
+          "required": true,
+          "in": "query",
+          "description": "First UTC day of the range (inclusive, from 00:00:00 UTC).",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-01",
+            "type": "string"
+          },
+          "publicName": "start"
+        },
+        {
+          "name": "end",
+          "required": true,
+          "in": "query",
+          "description": "Last UTC day of the range (inclusive, through 23:59:59 UTC). May equal start for a single day.",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-08",
+            "type": "string"
+          },
+          "publicName": "end"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/ListFoodLogsResponse"
+        }
+      },
+      "responseType": "ListFoodLogsResponse"
+    },
+    "updateFoodLog": {
+      "operationId": "updateFoodLog",
+      "method": "PATCH",
+      "path": "/v1.2/food-logs/{log_id}",
+      "resource": "foodLogs",
+      "publicMethod": "update",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Your stable ID for the end user this request acts on — the data is per-user. Opaque to January; use the same ID your system already uses.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "x-end-user-timezone",
+          "in": "header",
+          "description": "Optional: the end user's IANA timezone, forwarded upstream for local-day date handling.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_timezone"
+        },
+        {
+          "name": "log_id",
+          "required": true,
+          "in": "path",
+          "description": "The log id returned when the log was created.",
+          "schema": {
+            "$ref": "#/components/schemas/FoodLogId"
+          },
+          "publicName": "log_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "foods",
+          "publicName": "foods",
+          "schema": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoodLogInputFood"
+            }
+          },
+          "required": false
+        },
+        {
+          "name": "timestamp_utc",
+          "publicName": "timestamp_utc",
+          "schema": {
+            "type": "string",
+            "example": "2024-09-13T11:34:56Z",
+            "description": "UTC consumption time, ending in Z."
+          },
+          "required": false
+        },
+        {
+          "name": "name",
+          "publicName": "name",
+          "schema": {
+            "type": "string",
+            "example": "Breakfast",
+            "maxLength": 256
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/UpdateFoodLogBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodLog"
+        }
+      },
+      "responseType": "FoodLog"
+    },
+    "deleteFoodLog": {
+      "operationId": "deleteFoodLog",
+      "method": "DELETE",
+      "path": "/v1.2/food-logs/{log_id}",
+      "resource": "foodLogs",
+      "publicMethod": "delete",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Your stable ID for the end user this request acts on — the data is per-user. Opaque to January; use the same ID your system already uses.",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "x-end-user-timezone",
+          "in": "header",
+          "description": "Optional: the end user's IANA timezone, forwarded upstream for local-day date handling.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_timezone"
+        },
+        {
+          "name": "log_id",
+          "required": true,
+          "in": "path",
+          "description": "The log id returned when the log was created.",
+          "schema": {
+            "$ref": "#/components/schemas/FoodLogId"
+          },
+          "publicName": "log_id"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/DeleteFoodLogResponse"
+        }
+      },
+      "responseType": "DeleteFoodLogResponse"
+    },
+    "predictGlucose": {
+      "operationId": "predictGlucose",
+      "method": "POST",
+      "path": "/v1.2/glucose/predictions",
+      "resource": "glucose",
+      "publicMethod": "predict",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "x-end-user-timezone",
+          "in": "header",
+          "description": "The end user's IANA timezone, e.g. America/New_York. Defaults to UTC when omitted; must be sent when using cgm_data — the history is bucketed into their local days.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_timezone"
+        }
+      ],
+      "fields": [
+        {
+          "name": "user_profile",
+          "publicName": "user_profile",
+          "schema": {
+            "$ref": "#/components/schemas/GlucosePredictionProfile"
+          },
+          "required": true
+        },
+        {
+          "name": "foods",
+          "publicName": "foods",
+          "schema": {
+            "description": "The meal to predict the glucose response for.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FoodLogInputFood"
+            }
+          },
+          "required": true
+        },
+        {
+          "name": "start_time",
+          "publicName": "start_time",
+          "schema": {
+            "type": "string",
+            "example": "2024-09-13T11:34:56Z",
+            "format": "date-time",
+            "description": "When the meal is (or will be) eaten. Must carry a timezone designator.",
+            "x-january-derived-from": "/components/schemas/GlucosePredictDto/properties/start_time",
+            "x-january-overlay-id": "NORMALIZATION-019",
+            "x-january-evidence": "EVIDENCE-009"
+          },
+          "required": true
+        },
+        {
+          "name": "cgm_data",
+          "publicName": "cgm_data",
+          "schema": {
+            "description": "Optional CGM history for personalization; requires consumed_foods.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CgmReading"
+            }
+          },
+          "required": false
+        },
+        {
+          "name": "consumed_foods",
+          "publicName": "consumed_foods",
+          "schema": {
+            "description": "The meals eaten during the CGM history; requires cgm_data.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsumedHistoricalFood"
+            }
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/PredictGlucoseBody"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/GlucosePrediction"
+        }
+      },
+      "responseType": "GlucosePrediction"
+    },
+    "mintClientToken": {
+      "operationId": "mintClientToken",
+      "method": "POST",
+      "path": "/v1.2/auth/client-tokens",
+      "resource": null,
+      "publicMethod": "mintClientToken",
+      "audience": "server",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [],
+      "fields": [
+        {
+          "name": "end_user_id",
+          "publicName": "end_user_id",
+          "schema": {
+            "type": "string",
+            "description": "Your stable ID for the end user this token acts as. The token is bound to it; requests made with the token act only on this user.",
+            "example": "acme-user-8271",
+            "maxLength": 64
+          },
+          "required": true
+        },
+        {
+          "name": "scopes",
+          "publicName": "scopes",
+          "schema": {
+            "type": "array",
+            "description": "What the token may do. Omit to grant the full client-grantable set (foods:read, food_scans:write, food_logs:read, food_logs:write, glucose:read, restaurants:read). Grant only what the screen needs.",
+            "example": [
+              "foods:read",
+              "food_scans:write",
+              "food_logs:read",
+              "food_logs:write",
+              "glucose:read",
+              "restaurants:read"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "foods:read",
+                "food_scans:write",
+                "food_logs:read",
+                "food_logs:write",
+                "glucose:read",
+                "restaurants:read"
+              ]
+            }
+          },
+          "required": false
+        },
+        {
+          "name": "ttl_seconds",
+          "publicName": "ttl_seconds",
+          "schema": {
+            "type": "number",
+            "description": "How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.",
+            "minimum": 300,
+            "maximum": 7200,
+            "default": 1800,
+            "example": 1800
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/CreateClientTokenDto"
+      },
+      "responses": {
+        "201": {
+          "$ref": "#/components/schemas/ClientTokenResponseDto"
+        }
+      },
+      "responseType": "ClientTokenResponseDto"
+    },
+    "revokeClientTokens": {
+      "operationId": "revokeClientTokens",
+      "method": "DELETE",
+      "path": "/v1.2/auth/client-tokens",
+      "resource": null,
+      "publicMethod": "revokeClientTokens",
+      "audience": "server",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "end_user_id",
+          "required": true,
+          "in": "query",
+          "description": "The end user whose outstanding client tokens should all be revoked.",
+          "schema": {
+            "maxLength": 64,
+            "example": "acme-user-8271",
+            "type": "string"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "204": null
+      },
+      "responseType": "ResponseMetadata"
+    },
+    "credits": {
+      "operationId": "credits",
+      "method": "GET",
+      "path": "/v1.2/credits",
+      "resource": null,
+      "publicMethod": "credits",
+      "audience": "server",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/CreditsResponseDto"
+        }
+      },
+      "responseType": "CreditsResponseDto"
+    }
+  }
+}
