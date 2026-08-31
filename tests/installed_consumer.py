@@ -160,7 +160,7 @@ def main():
                     assert_request(service["requests"][-1], fixture)
 
         asyncio.run(run())
-        assert len(service["requests"]) == 36
+        assert len(service["requests"]) == 38
         from PIL import Image
 
         fixtures = {item["operationId"]: item for item in FIXTURES["operations"]}
@@ -181,9 +181,9 @@ def main():
             user.food_analysis.correct(detections=analysis.detections, user_input="smaller portion")
             assert service["requests"][-1]["body"]["detections"][0]["future_field"] == {"value": 7}
             assert isinstance(client.credits(), models.CreditsResponseDto)
-        assert len(service["requests"]) == 40 and not service["responses"]
+        assert len(service["requests"]) == 42 and not service["responses"]
     print(
-        "Installed package: FoodPortion, 18 sync + 18 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
+        "Installed package: FoodPortion, 19 sync + 19 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
     )
 
 

@@ -35,6 +35,7 @@ OPERATIONS = (
     "foods.lookup_barcode",
     "foods.suggest_alternatives",
     "restaurants.search",
+    "restaurants.get_menu_items",
     "restaurants.search_menu_items",
     "food_analysis.analyze_photo",
     "food_analysis.analyze_description",
@@ -261,7 +262,7 @@ class Reporter:
         }
         cleanup_failures = sum(r["cleanup"] and r["status"] != "PASS" for r in self.results)
         passed = (
-            len(operations) == 18 * len(self.modes)
+            len(operations) == 19 * len(self.modes)
             and counts["PASS"] == len(operations)
             and all(r["status"] == "PASS" for r in self.results)
         )
@@ -269,7 +270,7 @@ class Reporter:
             "language": "python",
             "modes": self.modes,
             "status": "PASS" if passed else "FAIL",
-            "expectedOperations": 18 * len(self.modes),
+            "expectedOperations": 19 * len(self.modes),
             "counts": counts,
             "cleanupFailures": cleanup_failures,
             "expectedImageCases": len(self.image_cases) * len(self.modes),
@@ -453,7 +454,17 @@ async def workflow(
             "latitude": config.latitude,
             "longitude": config.longitude,
         }
-        await step("restaurants.search", lambda: user.restaurants.search(**location))
+        restaurants = await step("restaurants.search", lambda: user.restaurants.search(**location))
+        restaurant_id = (
+            restaurants.items[0].id if restaurants is not None and restaurants.items else None
+        )
+        await step(
+            "restaurants.get_menu_items",
+            lambda: user.restaurants.get_menu_items(restaurant_id=require_value(restaurant_id)),
+            blocked="restaurants.search did not return a restaurant"
+            if restaurant_id is None
+            else None,
+        )
         await step(
             "restaurants.search_menu_items", lambda: user.restaurants.search_menu_items(**location)
         )

@@ -231,7 +231,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 36}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 38}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -241,16 +241,16 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_18_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_19_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 36, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 38, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 38  # 18 + one client-token probe per mode.
+        assert len(state["requests"]) == 40  # 19 + one client-token probe per mode.
         assert len(state["revocations"]) == 2
         assert len(set(state["revocations"])) == 2
         assert all(
@@ -282,9 +282,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 36, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 38, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 72
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 74
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 
