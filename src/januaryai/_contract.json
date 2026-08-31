@@ -2711,6 +2711,77 @@
       "retryAmbiguous": true,
       "photoPreparation": false
     },
+    "getRestaurantMenuItems": {
+      "operationId": "getRestaurantMenuItems",
+      "method": "GET",
+      "path": "/v1.2/restaurants/{restaurant_id}/menu-items",
+      "resource": "restaurants",
+      "publicMethod": "getMenuItems",
+      "audience": "shared",
+      "parameterNames": {
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "x-end-user-id",
+          "in": "header",
+          "description": "Optional: your stable ID for the end user this request acts on behalf of. Opaque to January.",
+          "required": false,
+          "schema": {
+            "type": "string"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "restaurant_id",
+          "in": "path",
+          "required": true,
+          "description": "The id from a restaurant search result.",
+          "schema": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z0-9_-]{1,256}$"
+          },
+          "publicName": "restaurant_id"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 100
+          },
+          "publicName": "limit"
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "schema": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "default": 0
+          },
+          "publicName": "offset"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/SearchRestaurantMenuItemsResponse"
+        }
+      },
+      "responseType": "SearchRestaurantMenuItemsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
+    },
     "mintClientToken": {
       "operationId": "mintClientToken",
       "method": "POST",

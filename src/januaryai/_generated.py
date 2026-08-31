@@ -113,6 +113,20 @@ class SyncRestaurants(SyncResource):
             "searchRestaurantMenuItems", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
         ))
 
+    def get_menu_items(
+        self, *,
+        end_user_id: str | UnsetType = UNSET,
+        restaurant_id: str,
+        limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> SearchRestaurantMenuItemsResponse:
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    restaurant_id: The id from a restaurant search result.\n    limit: limit (omit to use the server default).\n    offset: offset (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(SearchRestaurantMenuItemsResponse, self._transport.request(
+            "getRestaurantMenuItems", {"end_user_id": end_user_id, "restaurant_id": restaurant_id, "limit": limit, "offset": offset}, SearchRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
+        ))
+
 @dataclass(frozen=True, repr=False)
 class SyncFoodAnalysis(SyncResource):
     def analyze_photo(
@@ -385,6 +399,19 @@ class AsyncRestaurants(AsyncResource):
         "Find matching menu items across nearby restaurants.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    radius: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).\n    limit: Maximum number of results to return.\n    query: Dish or restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SearchRestaurantMenuItemsResponse, await self._transport.request(
             "searchRestaurantMenuItems", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout,
+        ))
+
+    async def get_menu_items(
+        self, *,
+        end_user_id: str | UnsetType = UNSET,
+        restaurant_id: str,
+        limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> SearchRestaurantMenuItemsResponse:
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    restaurant_id: The id from a restaurant search result.\n    limit: limit (omit to use the server default).\n    offset: offset (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(SearchRestaurantMenuItemsResponse, await self._transport.request(
+            "getRestaurantMenuItems", {"end_user_id": end_user_id, "restaurant_id": restaurant_id, "limit": limit, "offset": offset}, SearchRestaurantMenuItemsResponse, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)

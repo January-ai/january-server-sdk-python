@@ -31,7 +31,7 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Getting an API key](#getting-an-api-key)
 - [Installation and dependencies](#installation-and-dependencies)
 - [Quickstart](#quickstart)
-- [All 18 operations at a glance](#all-18-operations-at-a-glance)
+- [All 19 operations at a glance](#all-19-operations-at-a-glance)
 - [End users and user views](#end-users-and-user-views)
 - [Food analysis and photos](#food-analysis-and-photos)
 - [Portions and serving sizes](#portions-and-serving-sizes)
@@ -138,7 +138,7 @@ a valid result. Replace the example user ID with your authenticated user's ID.
 the `.env`; the SDK never searches for one. Existing environment values take
 precedence. The example disables retries to keep it to one request.
 
-## All 18 operations at a glance
+## All 19 operations at a glance
 
 The table uses an open `client` and a `user = client.for_user(...)` view.
 Calls show the main arguments; replace `...` with your application's values.
@@ -156,6 +156,7 @@ All arguments are keyword-only. Async clients expose the same methods with `awai
 | `user.foods.suggest_alternatives(food_id=...)` | Find food alternatives with dietary filters | `SuggestFoodAlternativesResponse` |
 | `user.restaurants.search(query=..., latitude=..., longitude=...)` | Find nearby restaurants | `SearchRestaurantsResponse` |
 | `user.restaurants.search_menu_items(query=..., latitude=..., longitude=...)` | Find dishes across nearby restaurant menus | `SearchRestaurantMenuItemsResponse` |
+| `user.restaurants.get_menu_items(restaurant_id=..., limit=100, offset=0)` | Load the selected restaurant’s menu by ID | `SearchRestaurantMenuItemsResponse` |
 | `user.food_logs.create(foods=...)` | Record a meal for a user | `FoodLog` |
 | `user.food_logs.list(start=..., end=...)` | List food logs within a date range | `ListFoodLogsResponse` |
 | `user.food_logs.update(log_id=..., name=...)` | Update a food log's supplied fields | `FoodLog` |
@@ -347,3 +348,5 @@ Released under the [MIT license](LICENSE). For help, contact
 [support@january.ai](mailto:support@january.ai) with a minimal reproduction and
 safe request IDs. Report sensitive issues privately using the
 [security policy](SECURITY.md).
+
+The new `get_menu_items` operation requires the backend restaurant-ID menu endpoint. Deployment is pending for this unreleased change. Use `offset` to page through the returned `total_count`; the async client exposes the same method.

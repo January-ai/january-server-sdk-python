@@ -49,8 +49,8 @@ def test_dependency_constraints_match_the_package():
     assert "python-dotenv" not in rows
 
 
-def test_all_18_documented_calls_and_returns_match_the_contract():
-    section = README.split("## All 18 operations at a glance\n", 1)[1].split("## End users", 1)[0]
+def test_all_19_documented_calls_and_returns_match_the_contract():
+    section = README.split("## All 19 operations at a glance\n", 1)[1].split("## End users", 1)[0]
     rows = re.findall(r"^\| `([^`]+)` \| [^|]+ \| `([^`]+)` \|$", section, re.M)
     surface = json.loads((ROOT / "sdk-surface.json").read_text(encoding="utf-8"))["operations"]
     descriptors = json.loads((ROOT / "src/januaryai/_contract.json").read_text(encoding="utf-8"))[
@@ -84,7 +84,7 @@ def test_all_18_documented_calls_and_returns_match_the_contract():
             )
             assert name not in seen
             seen[name] = response
-    assert len(rows) == 18 and seen == expected
+    assert len(rows) == 19 and seen == expected
 
 
 def test_contents_and_local_links_resolve():
@@ -102,7 +102,7 @@ def test_contents_and_local_links_resolve():
 
 
 def test_quickstart_stays_short_and_matches_the_executable_example():
-    section = README.split("## Quickstart\n", 1)[1].split("## All 18 operations", 1)[0]
+    section = README.split("## Quickstart\n", 1)[1].split("## All 19 operations", 1)[0]
     match = re.search(r"```python\n(.*?)```", section, re.S)
     assert match is not None
     code = match.group(1)
