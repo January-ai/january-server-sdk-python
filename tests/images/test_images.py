@@ -319,15 +319,16 @@ def test_icc_profile_survives_a_re_encode() -> None:
     API or the SDK announces.
     """
     oversized, profile = build_icc_jpeg((2000, 1500))
-    compliant, _ = build_icc_jpeg((200, 150))
+    compliant, compliant_profile = build_icc_jpeg((200, 150))
 
     re_encoded = open_result(prepare_image(oversized))
     passed_through = open_result(prepare_image(compliant))
 
     assert re_encoded.size == (MAX_IMAGE_DIMENSION, 768)
     assert re_encoded.info.get("icc_profile") == profile
-    # The two paths now agree, which is the whole point of carrying it.
-    assert passed_through.info.get("icc_profile") == profile
+    # Each image retains its own profile. Profile generation embeds a timestamp,
+    # so two separately created profiles need not have byte-identical headers.
+    assert passed_through.info.get("icc_profile") == compliant_profile
 
 
 def test_icc_profile_is_dropped_when_the_colour_space_changes(cmyk_jpeg_bytes: bytes) -> None:
