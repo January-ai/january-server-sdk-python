@@ -314,7 +314,7 @@ def test_default_base_url_without_opening_a_connection(script, base_url, monkeyp
 
 
 def test_local_package_metadata_points_to_real_docs():
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     assert project["name"] == "januaryai-server"
     assert project["readme"] == "README.md"
     assert project["requires-python"] == ">=3.11"
@@ -335,14 +335,14 @@ def test_public_docs_and_examples_do_not_expose_url_overrides():
         "examples/quickstart/async_main.py",
         "examples/live/main.py",
     ):
-        source = (ROOT / relative).read_text()
+        source = (ROOT / relative).read_text(encoding="utf-8")
         assert "JANUARY_BASE_URL" not in source, relative
         assert "base_url" not in source, relative
         assert "january-token-service-mock" not in source, relative
 
 
 def test_readme_onboarding_links_and_order():
-    readme = (ROOT / "README.md").read_text()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert readme.index("## Getting an API key") < readme.index(
         "## Installation and dependencies\n"
     )
@@ -351,7 +351,7 @@ def test_readme_onboarding_links_and_order():
     assert "test -e .env || cp .env.example .env" in readme
     assert "```gitignore\n.env\n```" in readme
     assert "export JANUARY_API_KEY" not in readme
-    template = (ROOT / ".env.example").read_text().splitlines()
+    template = (ROOT / ".env.example").read_text(encoding="utf-8").splitlines()
     assert [line for line in template if line and not line.startswith("#")] == ["JANUARY_API_KEY="]
     assert "python quickstart.py" in readme
     assert "quickstart-diagnostics.md" in readme

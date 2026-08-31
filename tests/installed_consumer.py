@@ -14,7 +14,9 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 from januaryai import AsyncJanuary, FoodPortion, FoodPortionError, January, ResponseMetadata, models
 
-FIXTURES = json.loads(Path(__file__).with_name("fixtures").joinpath("contract.json").read_text())
+FIXTURES = json.loads(
+    Path(__file__).with_name("fixtures").joinpath("contract.json").read_text(encoding="utf-8")
+)
 
 
 def snake(value):

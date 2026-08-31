@@ -213,13 +213,13 @@ def test_mint_failures_are_generic_safe_and_not_retried(relay, tmp_path, failure
 
 
 def test_example_dependency_metadata():
-    root = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    example = tomllib.loads((ROOT / "examples/fastapi/pyproject.toml").read_text())
+    root = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    example = tomllib.loads((ROOT / "examples/fastapi/pyproject.toml").read_text(encoding="utf-8"))
     assert example["project"]["requires-python"] == root["requires-python"] == ">=3.11"
     assert "python-dotenv>=1.0" in example["project"]["dependencies"]
     assert (
         "python-dotenv>=1.0"
-        in (ROOT / "examples/fastapi/requirements.txt").read_text().splitlines()
+        in (ROOT / "examples/fastapi/requirements.txt").read_text(encoding="utf-8").splitlines()
     )
     assert not any(dependency.startswith("python-dotenv") for dependency in root["dependencies"])
     assert example["tool"]["uv"]["sources"]["januaryai-server"] == {
@@ -230,7 +230,7 @@ def test_example_dependency_metadata():
 
 @pytest.mark.parametrize("document", ["README.md", "CONTRIBUTING.md", "examples/fastapi/README.md"])
 def test_documentation_uses_the_same_api_key_setting(document):
-    text = (ROOT / document).read_text()
+    text = (ROOT / document).read_text(encoding="utf-8")
     assert "JANUARY_API_KEY" in text
     assert ".env" in text
     assert "JANUARY_SECRET_KEY" not in text

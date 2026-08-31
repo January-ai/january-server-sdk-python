@@ -370,7 +370,9 @@ def test_malformed_response_and_validation_before_network():
 
 
 def test_manifest_matches_public_methods():
-    manifest = json.loads(Path(__file__).parents[1].joinpath("sdk-surface.json").read_text())
+    manifest = json.loads(
+        Path(__file__).parents[1].joinpath("sdk-surface.json").read_text(encoding="utf-8")
+    )
     assert manifest["language"] == "python"
     assert len(manifest["operations"]) == 18
     for client_type in [January, AsyncJanuary]:

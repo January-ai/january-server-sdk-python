@@ -10,8 +10,8 @@ from pathlib import Path
 from januaryai import January
 
 ROOT = Path(__file__).resolve().parents[1]
-README = (ROOT / "README.md").read_text()
-PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
+README = (ROOT / "README.md").read_text(encoding="utf-8")
+PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
 
 def anchors(source):
@@ -52,8 +52,10 @@ def test_dependency_constraints_match_the_package():
 def test_all_18_documented_calls_and_returns_match_the_contract():
     section = README.split("## All 18 operations at a glance\n", 1)[1].split("## End users", 1)[0]
     rows = re.findall(r"^\| `([^`]+)` \| [^|]+ \| `([^`]+)` \|$", section, re.M)
-    surface = json.loads((ROOT / "sdk-surface.json").read_text())["operations"]
-    descriptors = json.loads((ROOT / "src/januaryai/_contract.json").read_text())["operations"]
+    surface = json.loads((ROOT / "sdk-surface.json").read_text(encoding="utf-8"))["operations"]
+    descriptors = json.loads((ROOT / "src/januaryai/_contract.json").read_text(encoding="utf-8"))[
+        "operations"
+    ]
     expected = {
         (
             f"user.{operation['resource']}.{operation['method']}"
@@ -96,7 +98,7 @@ def test_contents_and_local_links_resolve():
         file = ROOT / path
         assert file.is_file(), target
         if anchor:
-            assert anchor in anchors(file.read_text()), target
+            assert anchor in anchors(file.read_text(encoding="utf-8")), target
 
 
 def test_quickstart_stays_short_and_matches_the_executable_example():
@@ -104,5 +106,5 @@ def test_quickstart_stays_short_and_matches_the_executable_example():
     match = re.search(r"```python\n(.*?)```", section, re.S)
     assert match is not None
     code = match.group(1)
-    assert code == (ROOT / "examples/quickstart/minimal.py").read_text()
+    assert code == (ROOT / "examples/quickstart/minimal.py").read_text(encoding="utf-8")
     assert len(code.splitlines()) <= 20

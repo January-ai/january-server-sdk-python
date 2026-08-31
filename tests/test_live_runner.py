@@ -39,7 +39,9 @@ archive_spec = importlib.util.spec_from_file_location(
 assert archive_spec is not None and archive_spec.loader is not None
 archives = importlib.util.module_from_spec(archive_spec)
 archive_spec.loader.exec_module(archives)
-FIXTURES = json.loads((SDK / "tests/fixtures/contract.json").read_text())["operations"]
+FIXTURES = json.loads((SDK / "tests/fixtures/contract.json").read_text(encoding="utf-8"))[
+    "operations"
+]
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhQAAAABJRU5ErkJggg=="
 )
@@ -184,7 +186,7 @@ def run(root, state, mode="both"):
         code = live.main(
             ["--mode", mode], root=root, environ=synthetic_environment(root), emit=output.append
         )
-    report = json.loads((root / ".e2e-results/latest.json").read_text())
+    report = json.loads((root / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     return code, report, "\n".join(output)
 
 
@@ -203,7 +205,7 @@ def test_env_loader_quotes_precedence_and_no_shell_evaluation(tmp_path):
     assert values["LITERAL"] == "${HOME} # no expansion"
     assert values["QUOTED"] == "a b"
     assert not marker.exists()
-    assert env_file.read_text() == source
+    assert env_file.read_text(encoding="utf-8") == source
     other = tmp_path / "custom.env"
     other.write_text("JANUARY_API_KEY=custom\n")
     assert (
@@ -226,7 +228,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", reject)
     output = []
     code = live.main([], root=tmp_path, environ={}, emit=output.append)
-    result = json.loads((tmp_path / ".e2e-results/latest.json").read_text())
+    result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
     assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 36}
@@ -278,7 +280,7 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
     output = []
     with service() as state, loopback_http(state["url"]):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
-        report = json.loads((tmp_path / ".e2e-results/latest.json").read_text())
+        report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
         assert report["counts"] == {"PASS": 36, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}

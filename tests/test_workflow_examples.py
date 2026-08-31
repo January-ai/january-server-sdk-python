@@ -19,15 +19,19 @@ BY_ID = {item["operationId"]: item for item in FIXTURES["operations"]}
 
 
 def test_minimal_readme_is_the_runnable_example():
-    source = (ROOT / "examples/quickstart/minimal.py").read_text().strip()
-    assert source in re.findall(r"```python\n(.*?)\n```", (ROOT / "README.md").read_text(), re.S)
+    source = (ROOT / "examples/quickstart/minimal.py").read_text(encoding="utf-8").strip()
+    assert source in re.findall(
+        r"```python\n(.*?)\n```", (ROOT / "README.md").read_text(encoding="utf-8"), re.S
+    )
 
 
 def test_workflow_recipes_over_loopback(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("JANUARY_API_KEY", "sk-quickstart-offline-only")
     Image.new("RGB", (1200, 800), "green").save(tmp_path / "lunch.jpg")
-    blocks = re.findall(r"```python\n(.*?)\n```", (ROOT / "docs/recipes.md").read_text(), re.S)
+    blocks = re.findall(
+        r"```python\n(.*?)\n```", (ROOT / "docs/recipes.md").read_text(encoding="utf-8"), re.S
+    )
     for block, operation_ids in zip(
         blocks[:2],
         [
