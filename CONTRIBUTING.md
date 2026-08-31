@@ -1,107 +1,42 @@
-# Contributing and local development
+# Contributing
 
-[Back to the SDK README](README.md). Commands below run from this SDK root unless
-explicitly marked as contract-repository commands.
+For installation and SDK usage, see the [README](README.md).
 
-## Setup and offline verification
+## Development
 
-Python 3.11+ and `uv` are required for these contributor commands:
-
-```sh
-uv sync --extra test
-uv run pytest -q
-uv run pyright
-```
-
-To run repository examples with `python`, activate the environment using
-`source .venv/bin/activate` (macOS/Linux) or `.venv\Scripts\Activate.ps1`
-(PowerShell). Alternatively, prefix each example command with `uv run`.
-The test extra includes `python-dotenv` for the quickstarts only. Follow the
-[README setup](README.md#quickstart) to copy `.env.example` without overwriting an
-existing `.env`, fill in the key, and run examples from the SDK root.
-
-The regular pytest suite includes subprocess tests of the exact README sync and
-async quickstart sources. Children use temporary working directories and
-synthetic `.env` files or fake environment credentials;
-the test harness injects loopback transports programmatically. Children never
-inherit credential variables or load the root `.env`.
-It also covers all 18 operations, sparse nutrients, FoodPortion, user isolation,
-errors, encoding, cancellation, and cleanup behavior.
-
-Focused quickstart checks:
+Use Python 3.11+ and run these commands from the repository root:
 
 ```sh
-uv run pytest -q tests/test_quickstart.py
+python -m venv .venv
+# macOS/Linux: source .venv/bin/activate
+# PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e '.[test]'
+python -m pytest
+python -m ruff check src tests examples scripts
+python -m ruff format --check src tests examples scripts
+pyright
 ```
 
-## Build and verify distributions
+Tests use local fixtures and do not require an API key. Include regression tests
+with bug fixes. Files marked as generated are maintained through January's API
+contract; request API or model changes in an issue rather than editing them.
 
-After setup, use the single canonical distribution command:
+## Live API checks
+
+Optional: copy [.env.example](.env.example) to an ignored `.env` file without
+overwriting an existing file, and set `JANUARY_API_KEY`.
+[Enable client tokens](https://dashboard.january.ai/dashboard/client-tokens)
+before running the full workflow.
 
 ```sh
-bash scripts/test-distribution.sh
+python examples/live/main.py --mode both
+# Include additional photo input formats:
+python examples/live/main.py --mode both --image-matrix
 ```
 
-It builds wheel and sdist, checks archive member names for excluded credential and
-result paths, installs each artifact into a clean temporary environment, and runs
-both `tests/consumer.py` (prototype compatibility) and
-`tests/installed_consumer.py` (FoodPortion plus 18 sync/18 async HTTP calls).
-It checks installed `py.typed` type completeness and deletes temporary environments.
-All HTTP checks use localhost and fake credentials.
+These checks call production, consume credits, and create food logs and client
+tokens for temporary test users. Cleanup runs automatically; review any reported
+cleanup failures. Results are written to `.e2e-results/latest.json`. Never commit
+credentials or result files.
 
-To retain local build artifacts without publishing:
-
-```sh
-uv build --out-dir dist/server-sdk
-```
-
-Root `.env`, `.env.*`, and `.e2e-results` are explicitly excluded from wheel
-and sdist builds even outside a Git repository. Do not add credentials or results
-to package inputs. Distribution identity remains `januaryai-server` and its
-import is `januaryai`.
-
-## Contract generation
-
-Generated files must not be edited manually. The contract repository owns paths,
-models, public operation bindings, and vocabulary. Its artifact is a development
-profile, not an immutable released client contract.
-
-Run **from the partner-api-contract repository**, with the SDK path adjusted:
-
-```sh
-node tools/server-sdk/python.mjs \
-  --contract artifacts/server-sdk/contract.json \
-  --output /path/to/january-server-sdk-python
-# Add --check to verify generated output without writing.
-```
-
-The generator uses Node builtins and emits typed models, public operation wrappers,
-internal wire descriptors, `sdk-surface.json`, `sdk-contract.lock.json`, and a
-test-only copy of sibling `fixtures.json`. Locks contain raw contract/generator
-SHA-256 hashes and 18-operation coverage. Installed SDKs and standalone tests need
-no sibling repository.
-
-## Compatibility and legacy examples
-
-`January` and `AsyncJanuary` remain canonical clients. Existing
-`JanuaryClient` / `AsyncJanuaryClient` aliases, `client_tokens.create(...)`,
-demo token issuers, and the [FastAPI example](examples/fastapi/README.md) remain.
-The FastAPI example uses the SDK's built-in production endpoint and canonical
-`mint_client_token` operation. Like the quickstarts, it loads `JANUARY_API_KEY`
-from the current working directory's `.env`; existing environment values take
-precedence. Follow its README for setup and authenticated token-relay requests.
-
-The custom `client_token_path` override is unsupported: paths come only from the
-generated contract. Do not change API names or wire semantics in SDK wrappers.
-
-## Live testing and support
-
-[Live testing](docs/live-testing.md) is opt-in, consumes credits, and mutates only
-fresh synthetic users. Never add credentialed production runs to regular CI or
-the offline distribution check. Never overwrite an existing `.env`.
-
-For problems, share a minimal reproduction, runtime/package versions, and safe
-request IDs with [support@january.ai](mailto:support@january.ai). Do not include keys, tokens,
-food records, or response bodies. No public issue-tracker or release URL is
-configured in this local distribution. Coordinate changes through the existing
-project workflow; this guide does not authorize publishing or select a license.
+Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

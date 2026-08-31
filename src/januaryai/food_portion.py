@@ -1,16 +1,28 @@
+# pyright: reportUnnecessaryIsInstance=false
 """Local serving calculations shared by synchronous and asynchronous SDK users."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 from typing import Literal
 
-from .models import (FoodId, FoodLogInputFood, FoodLogInputServing, FoodSearchItem,
-                     NutrientAmount, NutritionFacts, ServingId, ServingOption)
-
+from .models import (
+    FoodId,
+    FoodLogInputFood,
+    FoodLogInputServing,
+    FoodSearchItem,
+    NutrientAmount,
+    NutritionFacts,
+    ServingId,
+    ServingOption,
+)
 
 FoodPortionErrorCode = Literal[
-    "no_servings", "serving_not_found", "invalid_serving", "invalid_quantity",
+    "no_servings",
+    "serving_not_found",
+    "invalid_serving",
+    "invalid_quantity",
 ]
 
 
@@ -39,7 +51,7 @@ def _scale_nutrition(nutrition: NutritionFacts, scale: float) -> NutritionFacts:
             continue
         amount = getattr(nutrition, name)
         if isinstance(amount, NutrientAmount):
-            amounts[name] = amount.model_copy(deep=True, update={"value":amount.value * scale})
+            amounts[name] = amount.model_copy(deep=True, update={"value": amount.value * scale})
     return nutrition.model_copy(deep=True, update=amounts)
 
 
@@ -57,15 +69,24 @@ class FoodPortion:
     selection: FoodLogInputFood
 
     @classmethod
-    def from_food(cls, food: FoodSearchItem, *, serving_id: ServingId | None = None,
-                  quantity: float | None = None) -> FoodPortion:
+    def from_food(
+        cls,
+        food: FoodSearchItem,
+        *,
+        serving_id: ServingId | None = None,
+        quantity: float | None = None,
+    ) -> FoodPortion:
         """Choose an exact serving ID, or first primary/first serving, and scale it."""
         if not food.servings:
             raise FoodPortionError("no_servings")
         if serving_id is None:
-            selected = next((serving for serving in food.servings if serving.is_primary), food.servings[0])
+            selected = next(
+                (serving for serving in food.servings if serving.is_primary), food.servings[0]
+            )
         else:
-            selected = next((serving for serving in food.servings if serving.id == serving_id), None)
+            selected = next(
+                (serving for serving in food.servings if serving.id == serving_id), None
+            )
         if selected is None:
             raise FoodPortionError("serving_not_found")
         if not _positive_finite(selected.quantity) or not _positive_finite(selected.scaling_factor):
@@ -79,9 +100,14 @@ class FoodPortion:
             serving=selected.model_copy(deep=True),
             quantity=requested,
             nutrition=_scale_nutrition(food.nutrients, scale),
-            total_weight_grams=(None if selected.weight_grams is None else
-                                selected.weight_grams * requested / selected.quantity),
+            total_weight_grams=(
+                None
+                if selected.weight_grams is None
+                else selected.weight_grams * requested / selected.quantity
+            ),
             glycemic_index=food.glycemic_index,
             glycemic_load=None if food.glycemic_load is None else food.glycemic_load * scale,
-            selection=FoodLogInputFood(id=food.id, serving=FoodLogInputServing(id=selected.id, quantity=requested)),
+            selection=FoodLogInputFood(
+                id=food.id, serving=FoodLogInputServing(id=selected.id, quantity=requested)
+            ),
         )

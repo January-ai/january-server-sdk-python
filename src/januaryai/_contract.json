@@ -1687,7 +1687,10 @@
           "$ref": "#/components/schemas/FoodSearchResults"
         }
       },
-      "responseType": "FoodSearchResults"
+      "responseType": "FoodSearchResults",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "autocompleteFoods": {
       "operationId": "autocompleteFoods",
@@ -1754,7 +1757,10 @@
           "$ref": "#/components/schemas/AutocompleteFoodsResponse"
         }
       },
-      "responseType": "AutocompleteFoodsResponse"
+      "responseType": "AutocompleteFoodsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "suggestFoodAlternatives": {
       "operationId": "suggestFoodAlternatives",
@@ -1838,7 +1844,10 @@
           "$ref": "#/components/schemas/SuggestFoodAlternativesResponse"
         }
       },
-      "responseType": "SuggestFoodAlternativesResponse"
+      "responseType": "SuggestFoodAlternativesResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "lookupFoodByBarcode": {
       "operationId": "lookupFoodByBarcode",
@@ -1880,7 +1889,10 @@
           "$ref": "#/components/schemas/FoodSearchResults"
         }
       },
-      "responseType": "FoodSearchResults"
+      "responseType": "FoodSearchResults",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "getFood": {
       "operationId": "getFood",
@@ -1922,7 +1934,10 @@
           "$ref": "#/components/schemas/FoodSearchItem"
         }
       },
-      "responseType": "FoodSearchItem"
+      "responseType": "FoodSearchItem",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "searchRestaurants": {
       "operationId": "searchRestaurants",
@@ -2019,7 +2034,10 @@
           "$ref": "#/components/schemas/SearchRestaurantsResponse"
         }
       },
-      "responseType": "SearchRestaurantsResponse"
+      "responseType": "SearchRestaurantsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "searchRestaurantMenuItems": {
       "operationId": "searchRestaurantMenuItems",
@@ -2116,7 +2134,10 @@
           "$ref": "#/components/schemas/SearchRestaurantMenuItemsResponse"
         }
       },
-      "responseType": "SearchRestaurantMenuItemsResponse"
+      "responseType": "SearchRestaurantMenuItemsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "scanFoodPhoto": {
       "operationId": "scanFoodPhoto",
@@ -2161,7 +2182,10 @@
           "$ref": "#/components/schemas/FoodScan"
         }
       },
-      "responseType": "FoodScan"
+      "responseType": "FoodScan",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": true
     },
     "searchFoodsByNaturalLanguage": {
       "operationId": "searchFoodsByNaturalLanguage",
@@ -2210,7 +2234,10 @@
           "$ref": "#/components/schemas/FoodScan"
         }
       },
-      "responseType": "FoodScan"
+      "responseType": "FoodScan",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "correctPhotoScan": {
       "operationId": "correctPhotoScan",
@@ -2277,7 +2304,10 @@
           "$ref": "#/components/schemas/FoodScan"
         }
       },
-      "responseType": "FoodScan"
+      "responseType": "FoodScan",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "createFoodLog": {
       "operationId": "createFoodLog",
@@ -2355,7 +2385,10 @@
           "$ref": "#/components/schemas/FoodLog"
         }
       },
-      "responseType": "FoodLog"
+      "responseType": "FoodLog",
+      "retryNever": false,
+      "retryAmbiguous": false,
+      "photoPreparation": false
     },
     "listFoodLogs": {
       "operationId": "listFoodLogs",
@@ -2421,7 +2454,10 @@
           "$ref": "#/components/schemas/ListFoodLogsResponse"
         }
       },
-      "responseType": "ListFoodLogsResponse"
+      "responseType": "ListFoodLogsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "updateFoodLog": {
       "operationId": "updateFoodLog",
@@ -2508,7 +2544,10 @@
           "$ref": "#/components/schemas/FoodLog"
         }
       },
-      "responseType": "FoodLog"
+      "responseType": "FoodLog",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "deleteFoodLog": {
       "operationId": "deleteFoodLog",
@@ -2560,7 +2599,10 @@
           "$ref": "#/components/schemas/DeleteFoodLogResponse"
         }
       },
-      "responseType": "DeleteFoodLogResponse"
+      "responseType": "DeleteFoodLogResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "predictGlucose": {
       "operationId": "predictGlucose",
@@ -2664,7 +2706,10 @@
           "$ref": "#/components/schemas/GlucosePrediction"
         }
       },
-      "responseType": "GlucosePrediction"
+      "responseType": "GlucosePrediction",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "mintClientToken": {
       "operationId": "mintClientToken",
@@ -2740,7 +2785,10 @@
           "$ref": "#/components/schemas/ClientTokenResponseDto"
         }
       },
-      "responseType": "ClientTokenResponseDto"
+      "responseType": "ClientTokenResponseDto",
+      "retryNever": false,
+      "retryAmbiguous": false,
+      "photoPreparation": false
     },
     "revokeClientTokens": {
       "operationId": "revokeClientTokens",
@@ -2772,7 +2820,10 @@
       "responses": {
         "204": null
       },
-      "responseType": "ResponseMetadata"
+      "responseType": "ResponseMetadata",
+      "retryNever": true,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     },
     "credits": {
       "operationId": "credits",
@@ -2804,7 +2855,21 @@
           "$ref": "#/components/schemas/CreditsResponseDto"
         }
       },
-      "responseType": "CreditsResponseDto"
+      "responseType": "CreditsResponseDto",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
     }
+  },
+  "pythonPolicy": {
+    "automaticRetries": 2,
+    "retryAfterSecondsPerCall": 60,
+    "retryNever": [
+      "revokeClientTokens"
+    ],
+    "retryAmbiguousNever": [
+      "mintClientToken",
+      "createFoodLog"
+    ]
   }
 }

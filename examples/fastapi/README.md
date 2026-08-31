@@ -62,15 +62,3 @@ without contacting January. Mint failures return HTTP 502
 Keep the demo bound to `127.0.0.1`. Before deployment, replace the header dependency
 with a verified session/JWT and derive the user ID on the server. Return a token
 only to that authenticated user; never log credentials or token responses.
-
-## Offline regression tests
-
-From the SDK root, run only this example's tests:
-
-```sh
-uv run --no-env-file --extra test pytest -q tests/test_fastapi_example.py
-```
-
-These execute the actual app's startup, ASGI route, and shutdown with fake keys,
-temporary working directories, test-owned HTTP responses, and blocked network
-connections. They never read a real `.env` or contact January.

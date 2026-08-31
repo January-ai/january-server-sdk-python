@@ -1,7 +1,8 @@
+# pyright: reportUnnecessaryIsInstance=false
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Callable
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 
 from .errors import JanuaryConfigurationError
 from .types import ClientToken, CreateClientTokenInput
@@ -29,7 +30,7 @@ class _DemoIssuerBase:
             )
         self._access_token = normalized
         self._expires_in = expires_in
-        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._now = now or (lambda: datetime.now(UTC))
 
     def _create(self, request: CreateClientTokenInput) -> ClientToken:
         validate_create_input(request)
