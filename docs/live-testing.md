@@ -36,6 +36,8 @@ and creating/deleting synthetic food logs and client tokens:
 uv run python examples/live/main.py
 # Equivalent: uv run python examples/live/main.py --mode both
 # Individual modes: --mode sync or --mode async
+# All supported photo inputs and representative image transformations:
+uv run python examples/live/main.py --mode both --image-matrix
 ```
 
 Each mode gets a new `sdk-e2e-python-UUID` user in UTC. An existing user ID cannot
@@ -74,6 +76,13 @@ Cleanup failure fails the run. There are no transport retries or revoke-all
 loops; no assertion assumes immediate token rejection after revocation because
 the API permits a 60-second cache delay. Hard process termination cannot guarantee
 cleanup; failed or interrupted runs must not be represented as passing.
+
+`--image-matrix` adds 17 photo requests per mode (34 in both modes). Including
+the normal PNG data-URI operation, this covers 18 image cases per mode: URL,
+PNG/JPEG data URIs, paths, byte containers, files, Pillow, and format/transform
+variants. Image outcomes have separate `imageCounts` in the report; missing or
+failed cases fail the run. See the [coverage matrix and fixture inventory](e2e-coverage.md)
+for the precise split between production checks and deterministic local faults.
 
 Credentialed live runs are never part of offline tests, CI, or distribution checks.
 The runner's deterministic tests use test-owned transport injection for both SDK

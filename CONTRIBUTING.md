@@ -11,6 +11,8 @@ Python 3.11+ and `uv` are required for these contributor commands:
 uv sync --extra test
 uv run pytest -q
 uv run pyright
+uv run ruff check src tests examples scripts
+uv run ruff format --check src tests examples scripts
 ```
 
 To run repository examples with `python`, activate the environment using
@@ -27,6 +29,18 @@ the test harness injects loopback transports programmatically. Children never
 inherit credential variables or load the root `.env`.
 It also covers all 18 operations, sparse nutrients, FoodPortion, user isolation,
 errors, encoding, cancellation, and cleanup behavior.
+
+Type checking includes all source, tests, examples and scripts. The SDK, public
+consumer type fixtures and quickstarts use strict Pyright; dynamic HTTP fixtures
+and the remaining tooling use standard checking. Negative tests suppress only
+the specific error they deliberately exercise. Ruff enables the reference SDK's
+E/F/W/I/UP/B/C4/SIM/RUF families (wrapping is handled by the formatter); generated
+files retain the contract generator's deterministic formatting.
+
+`tests/test_error_parity.py` covers reference error classification, credential
+safety in traceback locals, closed-client ownership, mixed retry budgets, safe
+diagnostics and native dates in sync, asyncio and Trio modes. No old SDK checkout
+or production credential is required.
 
 Focused quickstart checks:
 
@@ -102,6 +116,5 @@ the offline distribution check. Never overwrite an existing `.env`.
 
 For problems, share a minimal reproduction, runtime/package versions, and safe
 request IDs with [support@january.ai](mailto:support@january.ai). Do not include keys, tokens,
-food records, or response bodies. No public issue-tracker or release URL is
-configured in this local distribution. Coordinate changes through the existing
-project workflow; this guide does not authorize publishing or select a license.
+food records, or response bodies. See [release tooling](docs/releasing.md) for the
+maintainer checklist and [security policy](SECURITY.md) for private reporting.

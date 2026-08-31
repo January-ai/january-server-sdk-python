@@ -1,19 +1,19 @@
 """Run the real FastAPI relay with test-owned dotenv files and no network access."""
+
 import asyncio
 import importlib.util
 import json
 import logging
 import os
-from pathlib import Path
 import socket
 import tomllib
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
 import pytest
 
 from januaryai import AsyncJanuary, JanuaryConfigurationError
-
 
 ROOT = Path(__file__).resolve().parents[1]
 FAKE_KEY = "sk-fastapi-offline-only"
@@ -37,11 +37,17 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
     monkeypatch.setattr(socket, "getaddrinfo", forbid_network)
 
     state = SimpleNamespace(
-        requests=[], clients=[], dotenv_paths=[], error=None, status=201,
+        requests=[],
+        clients=[],
+        dotenv_paths=[],
+        error=None,
+        status=201,
         body={
-            "token": FAKE_TOKEN, "expires_in": 1800,
+            "token": FAKE_TOKEN,
+            "expires_in": 1800,
             "expires_at": "2026-08-30T18:30:00Z",
-            "end_user_id": USER_ID, "scopes": ["foods:read"],
+            "end_user_id": USER_ID,
+            "scopes": ["foods:read"],
         },
     )
 
@@ -51,7 +57,9 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
         assert request.method == "POST"
         assert request.headers["authorization"] == f"Bearer {FAKE_KEY}"
         assert json.loads(request.content) == {
-            "end_user_id": USER_ID, "scopes": ["foods:read"], "ttl_seconds": 1800,
+            "end_user_id": USER_ID,
+            "scopes": ["foods:read"],
+            "ttl_seconds": 1800,
         }
         if state.error is not None:
             raise state.error
@@ -61,7 +69,8 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
 
     def sdk_http_client(*args, **kwargs):
         client = original_async_client(
-            *args, **{**kwargs, "transport": httpx.MockTransport(upstream), "trust_env": False},
+            *args,
+            **{**kwargs, "transport": httpx.MockTransport(upstream), "trust_env": False},
         )
         state.clients.append(client)
         return client
@@ -72,7 +81,10 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
         raise AssertionError("The relay must call canonical mint_client_token")
 
     monkeypatch.setattr(AsyncJanuary, "client_tokens", property(forbid_prototype_alias))
-    spec = importlib.util.spec_from_file_location("fastapi_example", ROOT / "examples/fastapi/main.py")
+    spec = importlib.util.spec_from_file_location(
+        "fastapi_example", ROOT / "examples/fastapi/main.py"
+    )
+    assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     original_load_dotenv = module.load_dotenv
@@ -88,12 +100,15 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
     monkeypatch.setattr(module, "load_dotenv", load_only_test_dotenv)
 
     async def exercise(*, headers=None, body=None):
-        async with module.app.router.lifespan_context(module.app):
-            async with original_async_client(
+        async with (
+            module.app.router.lifespan_context(module.app),
+            original_async_client(
                 transport=httpx.ASGITransport(app=module.app),
-                base_url="http://127.0.0.1:4020", trust_env=False,
-            ) as browser:
-                return await browser.post("/api/january/token", headers=headers, json=body)
+                base_url="http://127.0.0.1:4020",
+                trust_env=False,
+            ) as browser,
+        ):
+            return await browser.post("/api/january/token", headers=headers, json=body)
 
     state.call = lambda **kwargs: asyncio.run(exercise(**kwargs))
     yield state
@@ -142,7 +157,7 @@ def test_missing_auth_returns_401_without_minting(relay, tmp_path, headers):
 def test_missing_key_fails_startup_without_network(relay, tmp_path, key):
     if key is not None:
         (tmp_path / ".env").write_text(f'JANUARY_API_KEY="{key}"\n')
-    with pytest.raises(RuntimeError, match="Set JANUARY_API_KEY in .env or your environment"):
+    with pytest.raises(RuntimeError, match=r"Set JANUARY_API_KEY in \.env or your environment"):
         relay.call()
     assert relay.requests == relay.clients == []
 
@@ -174,7 +189,9 @@ def test_invalid_key_fails_before_creating_http_client(relay, tmp_path):
     assert relay.requests == relay.clients == []
 
 
-@pytest.mark.parametrize("failure", [401, 403, 429, 503, "connection", "timeout", "malformed", "unexpected"])
+@pytest.mark.parametrize(
+    "failure", [401, 403, 429, 503, "connection", "timeout", "malformed", "unexpected"]
+)
 def test_mint_failures_are_generic_safe_and_not_retried(relay, tmp_path, failure):
     (tmp_path / ".env").write_text(f"JANUARY_API_KEY={FAKE_KEY}\n")
     private = f"private-upstream-detail {FAKE_KEY} {FAKE_TOKEN}"
@@ -200,9 +217,15 @@ def test_example_dependency_metadata():
     example = tomllib.loads((ROOT / "examples/fastapi/pyproject.toml").read_text())
     assert example["project"]["requires-python"] == root["requires-python"] == ">=3.11"
     assert "python-dotenv>=1.0" in example["project"]["dependencies"]
-    assert "python-dotenv>=1.0" in (ROOT / "examples/fastapi/requirements.txt").read_text().splitlines()
+    assert (
+        "python-dotenv>=1.0"
+        in (ROOT / "examples/fastapi/requirements.txt").read_text().splitlines()
+    )
     assert not any(dependency.startswith("python-dotenv") for dependency in root["dependencies"])
-    assert example["tool"]["uv"]["sources"]["januaryai-server"] == {"path": "../..", "editable": True}
+    assert example["tool"]["uv"]["sources"]["januaryai-server"] == {
+        "path": "../..",
+        "editable": True,
+    }
 
 
 @pytest.mark.parametrize("document", ["README.md", "CONTRIBUTING.md", "examples/fastapi/README.md"])

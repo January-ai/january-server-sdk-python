@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Sequence
 from dataclasses import dataclass
-from typing import Annotated, Awaitable, ClassVar, Literal, Protocol, Sequence
+from typing import Annotated, ClassVar, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 ClientScope = Literal[
-    "foods:read", "food_scans:write", "food_logs:read", "food_logs:write",
-    "glucose:read", "restaurants:read",
+    "foods:read",
+    "food_scans:write",
+    "food_logs:read",
+    "food_logs:write",
+    "glucose:read",
+    "restaurants:read",
 ]
 
 
