@@ -130,9 +130,11 @@ def test_offline_guard_still_blocks_connections(relay):
     # Creating asyncio's internal socket pair must not permit app networking.
     with pytest.raises(AssertionError, match="forbid all network connections"):
         socket.create_connection(("example.invalid", 443))
-    with socket.socket() as connection:
-        with pytest.raises(AssertionError, match="forbid all network connections"):
-            connection.connect(("127.0.0.1", 1))
+    with (
+        socket.socket() as connection,
+        pytest.raises(AssertionError, match="forbid all network connections"),
+    ):
+        connection.connect(("127.0.0.1", 1))
 
 
 @pytest.mark.parametrize("credentials", ["cwd-dotenv", "environment-overrides-dotenv"])
