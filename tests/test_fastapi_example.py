@@ -22,7 +22,13 @@ USER_ID = "demo-user"
 
 
 @pytest.fixture
-def relay(tmp_path, monkeypatch, capsys, caplog):
+def relay(tmp_path, monkeypatch, capsys, caplog, request):
+    # Windows asyncio creates a loopback socket pair for its internal wake-up
+    # pipe. Initialize it before blocking networking, not during app execution.
+    # The application and SDK remain under the same strict network guard.
+    runner = asyncio.Runner()
+    runner.get_loop()
+    request.addfinalizer(runner.close)
     # No ambient credentials or dotenv settings; never discover a real .env.
     monkeypatch.setattr(os, "environ", {})
     monkeypatch.chdir(tmp_path)
@@ -110,7 +116,7 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
         ):
             return await browser.post("/api/january/token", headers=headers, json=body)
 
-    state.call = lambda **kwargs: asyncio.run(exercise(**kwargs))
+    state.call = lambda **kwargs: runner.run(exercise(**kwargs))
     yield state
 
     assert all(client.is_closed for client in state.clients)
@@ -118,6 +124,15 @@ def relay(tmp_path, monkeypatch, capsys, caplog):
     logs = output.out + output.err + caplog.text
     for secret in (FAKE_KEY, FAKE_TOKEN, "private-upstream-detail", "ct-invalid-file"):
         assert secret not in logs
+
+
+def test_offline_guard_still_blocks_connections(relay):
+    # Creating asyncio's internal socket pair must not permit app networking.
+    with pytest.raises(AssertionError, match="forbid all network connections"):
+        socket.create_connection(("example.invalid", 443))
+    with socket.socket() as connection:
+        with pytest.raises(AssertionError, match="forbid all network connections"):
+            connection.connect(("127.0.0.1", 1))
 
 
 @pytest.mark.parametrize("credentials", ["cwd-dotenv", "environment-overrides-dotenv"])
