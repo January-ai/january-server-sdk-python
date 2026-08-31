@@ -10,10 +10,8 @@ Build applications that understand what people eat: identify foods from photos
 or descriptions, look up nutrition and serving sizes, keep food diaries, and
 predict glucose responses.
 
-The SDK provides typed synchronous and asynchronous clients with the same API,
-automatic photo preparation, bounded retries and immutable user-scoped views.
-Its operation names follow January's client SDKs; Python uses keyword arguments
-and `snake_case`. Requests and models are generated from January's API contract.
+The SDK provides typed synchronous and asynchronous clients, automatic photo
+preparation, automatic retries and immutable user-scoped views.
 
 - **Understand food:** analyze a photo or description, then correct the result in plain language.
 - **Find nutrition:** search foods, look up barcodes, explore alternatives and restaurant menus.
@@ -41,7 +39,7 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Async usage](#async-usage)
 - [Errors and retries](#errors-and-retries)
 - [Configuration and type safety](#configuration-and-type-safety)
-- [Examples and testing](#examples-and-testing)
+- [Examples](#examples)
 - [Versioning and contributing](#versioning-and-contributing)
 - [License and support](#license-and-support)
 
@@ -89,8 +87,6 @@ The package is named `januaryai-server`; Python imports use `januaryai`.
 
 Pillow loads lazily when image processing needs it. Async applications can use
 asyncio or Trio; install `trio` separately if your application uses that backend.
-The [CI configuration](.github/workflows/ci.yml) covers Python 3.11–3.14 on Linux,
-plus Python 3.12 on macOS and Windows.
 
 ## Quickstart
 
@@ -171,9 +167,8 @@ All arguments are keyword-only. Async clients expose the same methods with `awai
 
 The first 15 operations also exist directly on `client`, with explicit
 `end_user_id=` and, where applicable, `end_user_timezone=`. The last three are
-server-only and are not exposed by a user view. Optional arguments and typed
-responses are documented in the [generated signatures](src/januaryai/_generated.py)
-and [models](src/januaryai/models.py).
+server-only and are not exposed by a user view. Your editor shows optional
+arguments and typed response fields through autocomplete.
 
 ## End users and user views
 
@@ -184,7 +179,7 @@ separate from another's.
 Reuse one client and call `client.for_user(user_id, end_user_timezone="UTC")`
 when handling a user's request. The returned view is immutable: its bound
 identity and timezone take precedence over per-call values, without changing the
-client or other views. There is no shared mutable “current user” setter.
+client or other views.
 
 Use an IANA timezone such as `America/New_York` when calendar days should follow
 the user's local time. Only operations declaring that header receive it.
@@ -225,8 +220,7 @@ HEIC/HEIF needs a decoder plugin or conversion first.
 
 Never treat an untrusted user's string as a local file path. Invalid local
 images raise `ValueError`, `TypeError` or `FileNotFoundError` before HTTP.
-See the [image fixtures and coverage matrix](docs/e2e-coverage.md) and
-[analysis → correction → logging recipe](docs/recipes.md#analyze-correct-then-log).
+See the [analysis → correction → logging recipe](docs/recipes.md#analyze-correct-then-log).
 
 ## Portions and serving sizes
 
@@ -325,32 +319,27 @@ Use `model_dump(mode="json", exclude_unset=True)` for JSON-ready output that
 preserves omissions. See [configuration and type-safety details](docs/configuration.md)
 for native datetimes and parsed accessors that preserve opaque timestamps.
 
-## Examples and testing
+## Examples
 
 | Example or guide | Start here |
 | --- | --- |
 | One-request quickstart | [minimal.py](examples/quickstart/minimal.py) |
-| Sync/async diagnostic handling | [Quickstart diagnostics](docs/quickstart-diagnostics.md) |
+| Food search with error handling | [Sync](examples/quickstart/main.py) · [Async](examples/quickstart/async_main.py) |
 | Analyze, correct and log; select a serving and log | [Workflow recipes](docs/recipes.md) |
 | Concurrent photo analysis | [concurrent.py](examples/analysis/concurrent.py) |
 | Local portion calculation | [main.py](examples/portions/main.py) |
-| All endpoints and image inputs against production | [Live runner](docs/live-testing.md) |
-| Exact live/local coverage and fixture inventory | [End-to-end coverage](docs/e2e-coverage.md) |
+| Issue client tokens from your backend | [FastAPI example](examples/fastapi/README.md) |
 
-Follow [contributor setup](CONTRIBUTING.md) to run repository examples and tests.
-Normal CI uses fake credentials and local HTTP. Production tests are opt-in,
-consume credits and clean up only the synthetic data they create.
+Follow the [quickstart setup](#quickstart), then run examples from the directory
+containing your `.env` file. The FastAPI example includes its own setup instructions.
 
 ## Versioning and contributing
 
-The SDK targets API `/v1.2`. PyPI package versions are separate from API versions;
-the [version file](src/januaryai/_version.py) supplies the package version and
-HTTP User-Agent. See the [changelog](CHANGELOG.md) before upgrading, pin a
-compatible version range and commit your application's dependency lockfile.
+The SDK targets API `/v1.2`; package versions are separate from API versions.
+See the [changelog](CHANGELOG.md) before upgrading and pin a compatible package
+version in your application.
 
-Generated operation bindings and models are maintained through January's API
-contract. See [contributing](CONTRIBUTING.md) for local development and generation,
-and the [release checklist](docs/releasing.md) for maintainers.
+To contribute a fix, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and support
 

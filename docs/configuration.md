@@ -65,7 +65,7 @@ refused due to a per-wait limit, cumulative server-wait limit, or request timeou
 ### Retries and timeouts
 
 Clients default to `max_retries=2` (at most three attempts). Set
-`max_retries=0` for one attempt, as the quickstarts and live-test runner do.
+`max_retries=0` for one attempt.
 
 Retry decisions use the stable API error code: transient rate/server/upstream
 failures can retry; exhausted credits and known permanent errors cannot.
@@ -80,7 +80,7 @@ A token mint or food-log creation is never replayed after an ambiguous network
 failure or 5xx, which could duplicate the write. Failures known to occur before
 sending, or a 429 rejection, may retry. Revocation always makes one request.
 Retried reads/analyses may consume extra credits if the previous attempt
-succeeded but its response was lost. No idempotency keys or API paths are invented.
+succeeded but its response was lost.
 
 Default limits are 60 seconds (5-second connection timeout), or 120 seconds for
 food analysis. Explicit client/per-call `timeout=` wins. It accepts seconds or

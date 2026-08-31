@@ -32,7 +32,7 @@ def test_badges_point_to_our_actual_package_workflow_and_metadata():
     minimum = PROJECT["requires-python"].removeprefix(">=")
     assert f"https://img.shields.io/badge/python-{minimum}%2B-blue.svg" in README
     assert f"[![License: {PROJECT['license']}]" in README
-    assert "[version file](src/januaryai/_version.py)" in README
+    assert "[changelog](CHANGELOG.md)" in README
     assert "badge/CI-passing" not in README
     assert "january_ai" not in README and "January-ai/python-sdk" not in README
 

@@ -33,7 +33,7 @@ class ClientToken(BaseModel):
 
     @property
     def access_token(self) -> str:
-        """Compatibility accessor for the previous local prototype."""
+        """Alias for token."""
         return self.token
 
     @property

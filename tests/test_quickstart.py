@@ -278,12 +278,10 @@ def test_quickstart_transport_diagnostics_do_not_print_cause(
 
 
 @pytest.mark.parametrize("script", SCRIPTS)
-def test_readme_code_is_byte_identical_to_runnable_source(script):
-    readme = (ROOT / "docs/quickstart-diagnostics.md").read_bytes()
-    marker = f"<!-- quickstart:{script} -->\n```python\n".encode()
-    match = re.search(re.escape(marker) + rb"(.*?)```", readme, re.DOTALL)
-    assert match is not None
-    assert match.group(1) == (ROOT / "examples/quickstart" / script).read_bytes()
+def test_readme_links_to_runnable_quickstarts(script):
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"](examples/quickstart/{script})" in readme
+    assert (ROOT / "examples/quickstart" / script).is_file()
 
 
 @pytest.mark.parametrize("script", SCRIPTS)
@@ -327,7 +325,8 @@ def test_public_docs_and_examples_do_not_expose_url_overrides():
     for relative in (
         "README.md",
         "CONTRIBUTING.md",
-        "docs/live-testing.md",
+        "docs/configuration.md",
+        "docs/recipes.md",
         ".env.example",
         "examples/fastapi/README.md",
         "examples/fastapi/main.py",
@@ -354,7 +353,8 @@ def test_readme_onboarding_links_and_order():
     template = (ROOT / ".env.example").read_text(encoding="utf-8").splitlines()
     assert [line for line in template if line and not line.startswith("#")] == ["JANUARY_API_KEY="]
     assert "python quickstart.py" in readme
-    assert "quickstart-diagnostics.md" in readme
+    assert "](examples/quickstart/main.py)" in readme
+    assert "](examples/quickstart/async_main.py)" in readme
     assert not re.search(
         r"unpublished|until publication|after publication|request SDK\s+access",
         readme,

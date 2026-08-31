@@ -33,7 +33,7 @@ def _credential(secret_key: str | None, api_key: str | None, demo: bool) -> str 
 
 
 class ClientTokens:
-    """Compatibility facade for the prototype. Prefer mint_client_token."""
+    """Client-token helpers. Prefer January.mint_client_token for new integrations."""
 
     def __init__(self, client: January, issuer: ClientTokenIssuer | None) -> None:
         self._client = client
