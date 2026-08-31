@@ -70,6 +70,10 @@ def local_service():
                     "body": json.loads(body) if body else None,
                 }
             )
+            if received := state.get("request_received"):
+                received.set()
+            if (gate := state.get("response_gate")) is not None and not gate.wait(timeout=10):
+                return
             time.sleep(state["delay"])
             response = state["responses"].pop(0) if state.get("responses") else state["response"]
             data = json.dumps(response["body"]).encode() if response["body"] is not None else b""
@@ -80,7 +84,7 @@ def local_service():
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            with suppress(BrokenPipeError, ConnectionResetError):
+            with suppress(BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
                 self.wfile.write(data)
 
         do_GET = do_POST = do_PATCH = do_DELETE = handle_request

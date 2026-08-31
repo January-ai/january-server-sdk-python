@@ -306,19 +306,11 @@ def test_reject_unbounded_timeout(timeout):
 
 def test_timeout_cancellation_and_no_retry():
     with local_service() as service:
-        service["delay"] = 0.1
+        received = service["request_received"] = Event()
+        release = service["response_gate"] = Event()
         service["response"] = next(
             f for f in FIXTURES["operations"] if f["operationId"] == "credits"
         )["response"]
-        with January(
-            max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
-        ) as client:
-            with pytest.raises(JanuaryTimeoutError):
-                client.credits(timeout=0.01)
-            event = Event()
-            event.set()
-            with pytest.raises(JanuaryCancelledError):
-                client.credits(cancel_event=event)
 
         async def run():
             async with AsyncJanuary(
@@ -326,14 +318,37 @@ def test_timeout_cancellation_and_no_retry():
             ) as client:
                 with pytest.raises(JanuaryTimeoutError):
                     await client.credits(timeout=0.01)
+                assert await asyncio.to_thread(received.wait, 10)
+                received.clear()
                 task = asyncio.create_task(client.credits())
-                await asyncio.sleep(0.02)
-                task.cancel()
-                with pytest.raises(asyncio.CancelledError):
-                    await task
+                try:
+                    # Cancel only after HTTP reaches the server, while its
+                    # response is held. Scheduler timing cannot complete it first.
+                    assert await asyncio.to_thread(received.wait, 10)
+                    task.cancel()
+                    with pytest.raises(asyncio.CancelledError):
+                        await task
+                finally:
+                    task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
 
-        asyncio.run(run())
-        assert len(service["requests"]) == 3
+        try:
+            with January(
+                max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
+            ) as client:
+                with pytest.raises(JanuaryTimeoutError):
+                    client.credits(timeout=0.01)
+                assert received.wait(timeout=10)
+                received.clear()
+                event = Event()
+                event.set()
+                with pytest.raises(JanuaryCancelledError):
+                    client.credits(cancel_event=event)
+
+            asyncio.run(run())
+            assert len(service["requests"]) == 3
+        finally:
+            release.set()
 
 
 def test_redirects_not_followed_and_injected_transport_not_closed():
