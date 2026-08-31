@@ -5,6 +5,7 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+
 from januaryai import AsyncJanuary
 
 
@@ -13,8 +14,10 @@ async def lifespan(app: FastAPI):
     load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
     key = os.environ.get("JANUARY_API_KEY", "").strip()
     if not key:
-        raise RuntimeError("Set JANUARY_API_KEY in .env or your environment before running this example.")
-    async with AsyncJanuary(secret_key=key) as january:
+        raise RuntimeError(
+            "Set JANUARY_API_KEY in .env or your environment before running this example."
+        )
+    async with AsyncJanuary(secret_key=key, max_retries=0) as january:
         app.state.january = january
         yield
 
@@ -39,7 +42,9 @@ async def create_january_token(
     # The caller cannot choose end_user_id or scopes; both are server-controlled.
     try:
         token = await request.app.state.january.mint_client_token(
-            end_user_id=user_id, scopes=["foods:read"], ttl_seconds=1800,
+            end_user_id=user_id,
+            scopes=["foods:read"],
+            ttl_seconds=1800,
         )
         # Relay schema expected by client SDKs: expires_in (seconds) -> expiresIn.
         return {"token": token.token, "expiresIn": token.expires_in}

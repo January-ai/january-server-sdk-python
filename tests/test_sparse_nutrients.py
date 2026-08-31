@@ -1,14 +1,15 @@
 """Contract-driven offline nutrient-presence regressions; never loads .env."""
+
 import asyncio
-from copy import deepcopy
 import inspect
+from copy import deepcopy
 
 import pytest
+from installed_consumer import FIXTURES, arguments, assert_request, local_service, method
 from pydantic import BaseModel
 
 from januaryai import AsyncJanuary, January, JanuaryResponseError
-from installed_consumer import FIXTURES, arguments, assert_request, local_service, method
-
+from januaryai.models import NutrientAmount
 
 CASES = FIXTURES["nutrientResponses"]
 OPERATIONS = {fixture["operationId"]: fixture for fixture in FIXTURES["operations"]}
@@ -18,8 +19,11 @@ def at_path(value, path):
     """Navigate either serialized wire dictionaries or generated model objects."""
     for segment in path:
         if isinstance(value, BaseModel):
-            name = next(name for name, field in type(value).model_fields.items()
-                        if (field.alias or name) == segment)
+            name = next(
+                name
+                for name, field in type(value).model_fields.items()
+                if (field.alias or name) == segment
+            )
             value = getattr(value, name)
         else:
             value = value[segment]
@@ -51,6 +55,7 @@ def assert_nutrient_presence(result, case):
             assert amount_model.model_fields_set == {"value", "unit"}
             if amount["value"] == 0:
                 assert nutrient_map[wire_name]["value"] == 0
+                assert isinstance(amount_model, NutrientAmount)
                 assert amount_model.value == 0
 
 
@@ -62,15 +67,17 @@ async def call(fn, **kwargs):
 def scenario(async_mode, service, body):
     async def run():
         client = (AsyncJanuary if async_mode else January)(
-            secret_key="sk-local-fixture", base_url=service["url"])
+            secret_key="sk-local-fixture", base_url=service["url"]
+        )
         try:
             await body(client)
         finally:
             await call(client.close)
+
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("case", CASES, ids=lambda case:case["name"])
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case["name"])
 @pytest.mark.parametrize("async_mode", [False, True], ids=["sync", "async"])
 def test_shared_nutrient_response_presence(case, async_mode):
     operation = OPERATIONS[case["operationId"]]
@@ -84,18 +91,22 @@ def test_shared_nutrient_response_presence(case, async_mode):
                 response = result.response
                 assert response is not None
                 assert response.status_code == case["response"]["status"]
-                assert response.request_id == {
-                    k.lower():v for k,v in case["response"]["headers"].items()
-                }["x-request-id"]
+                assert (
+                    response.request_id
+                    == {k.lower(): v for k, v in case["response"]["headers"].items()}[
+                        "x-request-id"
+                    ]
+                )
             else:
                 with pytest.raises(JanuaryResponseError) as caught:
                     await call(method(client, operation), **arguments(operation))
                 error = caught.value
                 assert error.status_code == case["response"]["status"]
-                expected_id = {
-                    k.lower():v for k,v in case["response"]["headers"].items()
-                }["x-request-id"]
+                expected_id = {k.lower(): v for k, v in case["response"]["headers"].items()}[
+                    "x-request-id"
+                ]
                 assert error.request_id == expected_id
+                assert error.response is not None
                 assert error.response.request_id == expected_id
             assert len(service["requests"]) == 1
             assert_request(service["requests"][0], operation)
@@ -103,17 +114,22 @@ def test_shared_nutrient_response_presence(case, async_mode):
         scenario(async_mode, service, run)
 
 
-@pytest.mark.parametrize("case", [case for case in CASES
-                                 if case["operationId"] == "scanFoodPhoto" and case["valid"]],
-                         ids=lambda case:case["name"])
+@pytest.mark.parametrize(
+    "case",
+    [case for case in CASES if case["operationId"] == "scanFoodPhoto" and case["valid"]],
+    ids=lambda case: case["name"],
+)
 @pytest.mark.parametrize("async_mode", [False, True], ids=["sync", "async"])
 def test_parsed_detection_correction_preserves_omitted_nutrients(case, async_mode):
     photo_operation = OPERATIONS["scanFoodPhoto"]
     correction_operation = OPERATIONS["correctPhotoScan"]
-    correction_case = next(candidate for candidate in CASES
-                           if candidate["operationId"] == "correctPhotoScan"
-                           and candidate["valid"]
-                           and candidate["expectedNutrients"] == case["expectedNutrients"])
+    correction_case = next(
+        candidate
+        for candidate in CASES
+        if candidate["operationId"] == "correctPhotoScan"
+        and candidate["valid"]
+        and candidate["expectedNutrients"] == case["expectedNutrients"]
+    )
     with local_service() as service:
         service["response"] = case["response"]
 
@@ -134,7 +150,8 @@ def test_parsed_detection_correction_preserves_omitted_nutrients(case, async_mod
 
             expected_request = deepcopy(correction_operation)
             expected_request["request"]["body"]["detections"] = photo.model_dump(
-                by_alias=True, exclude_unset=True)["detections"]
+                by_alias=True, exclude_unset=True
+            )["detections"]
             if photo.meal_name is not None:
                 expected_request["request"]["body"]["meal_name"] = photo.meal_name
             else:

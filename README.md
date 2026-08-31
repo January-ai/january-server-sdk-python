@@ -1,392 +1,349 @@
 # January Server SDK for Python
 
-Typed sync and async access to January's food, restaurant, food-analysis,
-food-log, and glucose APIs, plus server-only token and credit operations.
-Requires **Python 3.11+**.
+[![PyPI version](https://img.shields.io/pypi/v/januaryai-server.svg)](https://pypi.org/project/januaryai-server/)
+[![CI](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Use it only on trusted servers. Secret `sk-` keys must never reach browsers or
-mobile apps. The quickstarts below load your key from a local .env file.
+The official Python server SDK for [January AI](https://january.ai).
+Build applications that understand what people eat: identify foods from photos
+or descriptions, look up nutrition and serving sizes, keep food diaries, and
+predict glucose responses.
 
-## Before you begin
+The SDK provides typed synchronous and asynchronous clients, automatic photo
+preparation, automatic retries and immutable user-scoped views.
+
+- **Understand food:** analyze a photo or description, then correct the result in plain language.
+- **Find nutrition:** search foods, look up barcodes, explore alternatives and restaurant menus.
+- **Work with portions:** recalculate nutrients locally by serving and quantity.
+- **Build per-user experiences:** manage food logs and request glucose predictions.
+- **Connect mobile and web apps:** mint client tokens on your backend, revoke them and check credits.
+
+Use this SDK on trusted servers, in jobs or in local scripts. Keep server
+`sk-` keys out of mobile apps and browsers.
+
+[API reference](https://partners.january.ai/v1.2/docs#/) ·
+[Developer dashboard](https://dashboard.january.ai/dashboard) ·
+[Support](mailto:support@january.ai)
+
+## Contents
+
+- [Getting an API key](#getting-an-api-key)
+- [Installation and dependencies](#installation-and-dependencies)
+- [Quickstart](#quickstart)
+- [All 18 operations at a glance](#all-18-operations-at-a-glance)
+- [End users and user views](#end-users-and-user-views)
+- [Food analysis and photos](#food-analysis-and-photos)
+- [Portions and serving sizes](#portions-and-serving-sizes)
+- [Server-only APIs](#server-only-apis)
+- [Async usage](#async-usage)
+- [Errors and retries](#errors-and-retries)
+- [Configuration and type safety](#configuration-and-type-safety)
+- [Examples](#examples)
+- [Versioning and contributing](#versioning-and-contributing)
+- [License and support](#license-and-support)
+
+## Getting an API key
 
 1. [Sign up](https://dashboard.january.ai/sign-up) or
    [sign in](https://dashboard.january.ai/sign-in) to the developer platform.
-2. If you have no active organization, complete the required **Set up your
-   organization** prompt before continuing.
+2. If prompted, complete **Set up your organization**.
 3. Open the [dashboard](https://dashboard.january.ai/dashboard), then **API keys**
    → **Create key** → enter a **Key name** → **Create key**.
-4. Copy the full `sk-` key when it is shown. It is revealed only once; store it
-   in a secrets manager. For local development, put it in the ignored `.env` file
-   described below, never in browser/mobile code or source control.
+4. Copy the complete `sk-` key when shown. It is revealed only once. Store it in
+   your secrets manager, or in an ignored `.env` file for local development.
 
-Dashboard login authenticates you as a human. Backend SDK requests instead use
-the server API key (`sk-`). A client token (`ct-`) is a short-lived end-user
-credential for mobile/web clients and is rejected by this server SDK. Client
-tokens are optional and are **not needed for server-side food search**; see
-[server-only APIs](#server-only-apis) if you need to issue them.
+A dashboard login is not an API credential. This SDK uses a server API key;
+short-lived `ct-` client tokens are for mobile and web SDKs and are rejected here.
+You do not need to enable client tokens to search foods or analyze a photo.
 
-Check [Billing](https://dashboard.january.ai/billing) for your current plan and
-credit allowance. The first food-search call is billable; the SDK does not retry
-automatically. Use the independent root `credits()` call below when you need to
-check the balance.
+API calls may consume credits. Check your plan and allowance in
+[Billing](https://dashboard.january.ai/billing), or call `client.credits()`.
 
-## Install
+## Installation and dependencies
 
-In your Python project directory, create a virtual environment and install from PyPI:
+Requires **Python 3.11+**. Install into your project's virtual environment:
 
 ```sh
-python3 --version
-python3 -m venv .venv
-source .venv/bin/activate
 python -m pip install januaryai-server python-dotenv
 ```
 
-Ensure the version is 3.11 or newer. On a host with multiple interpreters, use
-`python3.11 -m venv .venv` if `python3` is older. On Windows, use
-`py -3.11 -m venv .venv` and activate with `.venv\Scripts\Activate.ps1` in
-PowerShell instead of `source`.
+Or, with uv:
 
-This installs the `januaryai-server` distribution and its runtime
-dependencies; Python imports use `januaryai`. `python-dotenv` is an example-only
-dependency for local configuration, not an SDK runtime dependency. No test
-dependencies are needed.
+```sh
+uv add januaryai-server python-dotenv
+```
+
+The package is named `januaryai-server`; Python imports use `januaryai`.
+`python-dotenv` is needed only for the local-file examples, not by the SDK itself.
+
+| Dependency | Constraint | Purpose |
+| --- | --- | --- |
+| `httpx` | `>=0.27,<1` | Synchronous and asynchronous HTTP |
+| `pydantic` | `>=2.10,<3` | Typed response models |
+| `pillow` | `>=10` | Local image decoding and preparation |
+| `anyio` | `>=4,<5` | Async timeouts, retry waits and image-preparation workers |
+| `typing-extensions` | `>=4.12,<5` | Type information across supported Python versions |
+
+Pillow loads lazily when image processing needs it. Async applications can use
+asyncio or Trio; install `trio` separately if your application uses that backend.
 
 ## Quickstart
 
-Save the complete example below as `quickstart.py` in your project directory.
-Create a `.env` file in that same directory, replacing the placeholder with your
-full `sk-` server key:
+Create a `.env` file beside your script, containing only your server API key:
 
 ```dotenv
 JANUARY_API_KEY=your-server-api-key
 ```
 
-Add `.env` to your project's `.gitignore` before storing the key:
+Add it to your project's `.gitignore`:
 
 ```gitignore
 .env
 ```
 
-If working in this SDK repository instead, copy its `.env.example` only when
-`.env` does not already exist, then fill in `JANUARY_API_KEY` in `.env`:
+In this repository, start from [.env.example](.env.example), without overwriting
+an existing file:
 
 ```sh
 test -e .env || cp .env.example .env
 ```
 
-The repository already ignores `.env`. Never commit or share it; it is a plain
-text local secret, not encrypted storage. For deployed applications, keep using
-your platform's secret manager or environment variables.
+Save the following as `quickstart.py`, then run `python quickstart.py` from that
+directory. It makes one food-search request to January's built-in production endpoint.
 
-With the virtual environment active, run from the directory containing `.env`:
-
-```sh
-python quickstart.py
-```
-
-This makes exactly one billable banana-search request; it creates no logs or tokens
-and makes no credit-balance calls. It uses the synthetic ID `january-quickstart`
-in UTC. In production, derive the ID from your authenticated user.
-
-Complete runnable source: [examples/quickstart/main.py](examples/quickstart/main.py).
-
-<!-- quickstart:main.py -->
+<!-- quickstart:minimal.py -->
 ```python
-import os
-import json
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from januaryai import (
-    January, JanuaryAPIError, JanuaryConfigurationError,
-    JanuaryConnectionError, JanuaryTimeoutError,
-)
+from januaryai import January
 
+load_dotenv(Path.cwd() / ".env", override=False)
 
-def main() -> int:
-    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
-    key = os.environ.get("JANUARY_API_KEY", "").strip()
-    if not key:
-        print("Set JANUARY_API_KEY in .env or your environment before running this example.", file=sys.stderr)
-        return 2
-    try:
-        with January(secret_key=key) as client:
-            # In production, derive this ID from your authenticated user.
-            user = client.for_user("january-quickstart", end_user_timezone="UTC")
-            foods = user.foods.search(query="banana")
-    except JanuaryAPIError as error:
-        # Only SDK-sanitized metadata; never print the error, message, body, or headers.
-        diagnostic = {"status": error.status_code, "code": error.code, "request_id": error.request_id}
-        print(f"Food search failed: {json.dumps(diagnostic)}", file=sys.stderr)
-        hint = {
-            401: "Check that JANUARY_API_KEY is the full active server key for your organization.",
-            403: "Check organization access and key permissions; see README troubleshooting.",
-            429: "Check the error code and README troubleshooting before another request.",
-        }.get(error.status_code, "Contact support@january.ai with these safe diagnostic fields.")
-        if error.status_code == 429 and error.code == "rate_limited":
-            hint = "Wait before trying again; this example does not retry automatically."
-        elif error.status_code == 429 and error.code == "credit_limit_exceeded":
-            hint = "Check your current plan and credit allowance at https://dashboard.january.ai/billing."
-        print(f"Hint: {hint}", file=sys.stderr)
-        return 1
-    except JanuaryConfigurationError:
-        print("Configuration error. Set a full sk- server key.", file=sys.stderr)
-        return 2
-    except JanuaryConnectionError as error:
-        code = "transport_timeout" if isinstance(error, JanuaryTimeoutError) else "transport_connection"
-        print(f"Food search failed: {code}. Check connectivity; no automatic retry.", file=sys.stderr)
-        return 1
-    except Exception:
-        print("Food search failed. Contact support@january.ai; do not share credentials.", file=sys.stderr)
-        return 1
+with January(max_retries=0) as client:
+    user = client.for_user("january-quickstart", end_user_timezone="UTC")
+    foods = user.foods.search(query="banana")
 
-    print(f"Foods returned: {len(foods.items)}")
-    if foods.items:
-        name = foods.items[0].name.replace(key, "[redacted]")
-        print(f"First food: {name}")
-    else:
-        print("No foods found for banana.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+print(f"Foods returned: {len(foods.items)}")
+if foods.items:
+    print(f"First food: {foods.items[0].name}")
 ```
 
-For async applications, save the following example as `quickstart_async.py` and
-run `python quickstart_async.py` from the same directory using the same `.env`. Complete source:
-[examples/quickstart/async_main.py](examples/quickstart/async_main.py).
+You get a result count and the first food name, if any. An empty `items` list is
+a valid result. Replace the example user ID with your authenticated user's ID.
 
-<!-- quickstart:async_main.py -->
+`January()` reads `JANUARY_API_KEY` from the environment. Your application loads
+the `.env`; the SDK never searches for one. Existing environment values take
+precedence. The example disables retries to keep it to one request.
+
+## All 18 operations at a glance
+
+The table uses an open `client` and a `user = client.for_user(...)` view.
+Calls show the main arguments; replace `...` with your application's values.
+All arguments are keyword-only. Async clients expose the same methods with `await`.
+
+| Call | What it does | Returns |
+| --- | --- | --- |
+| `user.food_analysis.analyze_photo(image=...)` | Identify foods in a photo | `FoodScan` |
+| `user.food_analysis.analyze_description(query=...)` | Understand a written food description | `FoodScan` |
+| `user.food_analysis.correct(detections=..., user_input=...)` | Revise an analysis in plain language | `FoodScan` |
+| `user.foods.search(query=...)` | Search the food database | `FoodSearchResults` |
+| `user.foods.autocomplete(query=...)` | Suggest food names while typing | `AutocompleteFoodsResponse` |
+| `user.foods.get(food_id=...)` | Retrieve a food and its serving options | `FoodSearchItem` |
+| `user.foods.lookup_barcode(upc=...)` | Find a food by barcode | `FoodSearchResults` |
+| `user.foods.suggest_alternatives(food_id=...)` | Find food alternatives with dietary filters | `SuggestFoodAlternativesResponse` |
+| `user.restaurants.search(query=..., latitude=..., longitude=...)` | Find nearby restaurants | `SearchRestaurantsResponse` |
+| `user.restaurants.search_menu_items(query=..., latitude=..., longitude=...)` | Find dishes across nearby restaurant menus | `SearchRestaurantMenuItemsResponse` |
+| `user.food_logs.create(foods=...)` | Record a meal for a user | `FoodLog` |
+| `user.food_logs.list(start=..., end=...)` | List food logs within a date range | `ListFoodLogsResponse` |
+| `user.food_logs.update(log_id=..., name=...)` | Update a food log's supplied fields | `FoodLog` |
+| `user.food_logs.delete(log_id=...)` | Delete a food log | `DeleteFoodLogResponse` |
+| `user.glucose.predict(user_profile=..., foods=..., start_time=...)` | Predict a meal's glucose response | `GlucosePrediction` |
+| `client.credits()` | Read the account's credit balance | `CreditsResponseDto` |
+| `client.mint_client_token(end_user_id=...)` | Mint a short-lived token for an end user | `ClientTokenResponseDto` |
+| `client.revoke_client_tokens(end_user_id=...)` | Revoke an end user's client tokens | `ResponseMetadata` |
+
+The first 15 operations also exist directly on `client`, with explicit
+`end_user_id=` and, where applicable, `end_user_timezone=`. The last three are
+server-only and are not exposed by a user view. Your editor shows optional
+arguments and typed response fields through autocomplete.
+
+## End users and user views
+
+An end-user ID is your application's stable identifier for the person the
+request belongs to. Food logs need that identity; it keeps one user's diary
+separate from another's.
+
+Reuse one client and call `client.for_user(user_id, end_user_timezone="UTC")`
+when handling a user's request. The returned view is immutable: its bound
+identity and timezone take precedence over per-call values, without changing the
+client or other views.
+
+Use an IANA timezone such as `America/New_York` when calendar days should follow
+the user's local time. Only operations declaring that header receive it.
+
+## Food analysis and photos
+
+A photo and a written description both return `FoodScan`: recognized foods,
+serving options and nutrition. `food_analysis.correct` accepts the returned
+detections and a description of what should change.
+
+Within an open client context, for an existing `user` view:
+
 ```python
-import asyncio
-import json
-import os
-import sys
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from januaryai import (
-    AsyncJanuary, JanuaryAPIError, JanuaryConfigurationError,
-    JanuaryConnectionError, JanuaryTimeoutError,
+analysis = user.food_analysis.analyze_photo(image="lunch.jpg")
+revised = user.food_analysis.correct(
+    detections=analysis.detections,
+    user_input="The rice portion was half as much",
 )
-
-
-async def main() -> int:
-    load_dotenv(dotenv_path=Path.cwd() / ".env", override=False)
-    key = os.environ.get("JANUARY_API_KEY", "").strip()
-    if not key:
-        print("Set JANUARY_API_KEY in .env or your environment before running this example.", file=sys.stderr)
-        return 2
-    try:
-        async with AsyncJanuary(secret_key=key) as client:
-            # In production, derive this ID from your authenticated user.
-            user = client.for_user("january-quickstart", end_user_timezone="UTC")
-            foods = await user.foods.search(query="banana")
-    except JanuaryAPIError as error:
-        # Only SDK-sanitized metadata; never print the error, message, body, or headers.
-        diagnostic = {"status": error.status_code, "code": error.code, "request_id": error.request_id}
-        print(f"Food search failed: {json.dumps(diagnostic)}", file=sys.stderr)
-        hint = {
-            401: "Check that JANUARY_API_KEY is the full active server key for your organization.",
-            403: "Check organization access and key permissions; see README troubleshooting.",
-            429: "Check the error code and README troubleshooting before another request.",
-        }.get(error.status_code, "Contact support@january.ai with these safe diagnostic fields.")
-        if error.status_code == 429 and error.code == "rate_limited":
-            hint = "Wait before trying again; this example does not retry automatically."
-        elif error.status_code == 429 and error.code == "credit_limit_exceeded":
-            hint = "Check your current plan and credit allowance at https://dashboard.january.ai/billing."
-        print(f"Hint: {hint}", file=sys.stderr)
-        return 1
-    except JanuaryConfigurationError:
-        print("Configuration error. Set a full sk- server key.", file=sys.stderr)
-        return 2
-    except JanuaryConnectionError as error:
-        code = "transport_timeout" if isinstance(error, JanuaryTimeoutError) else "transport_connection"
-        print(f"Food search failed: {code}. Check connectivity; no automatic retry.", file=sys.stderr)
-        return 1
-    except Exception:
-        print("Food search failed. Contact support@january.ai; do not share credentials.", file=sys.stderr)
-        return 1
-
-    print(f"Foods returned: {len(foods.items)}")
-    if foods.items:
-        name = foods.items[0].name.replace(key, "[redacted]")
-        print(f"First food: {name}")
-    else:
-        print("No foods found for banana.")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
 ```
 
-On success, either example prints `Foods returned: N` and `First food: <name>`.
-An empty search prints `Foods returned: 0` and `No foods found for banana.`;
-this is also a successful exit.
+Use `analyze_description(query="one banana and a bowl of oatmeal")` for text.
+An empty `detections` list is valid. Nutrient entries may be absent: check for
+`None` before reading a nutrient's `value`.
 
-A missing key exits before any request. API failures exit nonzero with sanitized
-status/code/request-ID fields and a fixed actionable hint, never the error,
-message, response body, headers, or token. Both quickstarts use the SDK's built-in
-production endpoint; no URL configuration is needed.
-Each quickstart loads only `.env` in the current working directory, without
-searching parent or source directories. Existing environment variables take
-precedence, including an explicitly empty key. The SDK still receives the key
-explicitly and never reads files. The separate [live runner](docs/live-testing.md)
-has its own environment-file rules.
+Photo inputs can be a public URL, Base64 **data URI**, trusted local path, bytes,
+bytearray, memoryview, binary file, BytesIO or Pillow image. JPEG, PNG, WebP and
+still GIF are supported. Raw Base64 needs the `data:image/...;base64,` prefix.
 
-## Common tasks
+Local preparation applies EXIF rotation, caps the longest side at 1024 pixels,
+and compresses when needed to a 3.5 MB encoded-image budget. It never upscales or
+mutates a supplied Pillow image. Async preparation runs off the event loop.
 
-All shared operations use the same resource tree on both clients:
+URLs/data URIs and compliant encoded files pass through unchanged, including
+any metadata. Re-encoding strips EXIF/GPS, while a modest RGB ICC profile may be
+retained. Pass a Pillow image to force re-encoding when metadata removal matters.
+`preprocess=False` skips resizing, not byte-limit or animation checks.
+HEIC/HEIF needs a decoder plugin or conversion first.
 
-| Resource | Methods |
-| --- | --- |
-| `foods` | `search`, `autocomplete`, `get`, `lookup_barcode`, `suggest_alternatives` |
-| `restaurants` | `search`, `search_menu_items` |
-| `food_analysis` | `analyze_photo`, `analyze_description`, `correct` |
-| `food_logs` | `create`, `list`, `update`, `delete` |
-| `glucose` | `predict` |
+Never treat an untrusted user's string as a local file path. Invalid local
+images raise `ValueError`, `TypeError` or `FileNotFoundError` before HTTP.
+See the [analysis → correction → logging recipe](docs/recipes.md#analyze-correct-then-log).
 
-`for_user` creates an immutable, shared-only view. Its bound user/timezone override
-per-call values without changing the root client. Parameters follow the existing
-client SDK: barcode `upc`, description `query`, photo URL/data URI `image`,
-food `food_id`, and log `log_id`. See [typed signatures](src/januaryai/_generated.py)
-and [models](src/januaryai/models.py).
+## Portions and serving sizes
 
-`FoodPortion.from_food` is local and synchronous even when food came from
-`AsyncJanuary`. Python uses `from_food` because `from` is a keyword.
-The following is a **fragment**, assuming `food` is an existing `FoodSearchItem`:
+`FoodPortion` recalculates nutrition locally, without API calls or credits.
+Given a `food` returned by the API:
 
 ```python
 from januaryai import FoodPortion
 
 portion = FoodPortion.from_food(food, quantity=2)
-nutrition = portion.nutrition.model_dump(by_alias=True, exclude_unset=True)
-selection = portion.selection  # Pass in foods=[selection] to log/glucose requests.
+nutrition = portion.nutrition
+selection = portion.selection  # Use in foods=[selection] when logging or predicting.
 ```
 
-It chooses the first primary serving, else the first; `serving_id=` selects an
-exact match. Quantity defaults to the serving quantity and must be finite,
-positive, and ≤10,000. All 16 nutrients and glycemic load scale by
-`quantity * scaling_factor / serving.quantity`; weight scales by
-`quantity / serving.quantity`, while GI stays unchanged. Units, zeros, missing
-values, and source models are preserved. `FoodPortionError(ValueError).code` is
-`no_servings`, `serving_not_found`, `invalid_serving`, or `invalid_quantity`.
+Pass `serving_id=` to select a specific serving; otherwise the first primary
+serving is used, falling back to the first available one. Quantity must be finite,
+positive and at most 10,000. Nutrients and glycemic load scale with the serving;
+glycemic index stays unchanged. The original food is never modified.
 
-Nutrient entries can be absent or the map empty; present entries require both
-`value` and `unit`. Use `model_fields_set` and `exclude_unset=True` to preserve
-omissions. Parsed detections sent to `food_analysis.correct` retain them.
+The utility also works with async results. See the
+[serving-selection recipe](docs/recipes.md#search-choose-a-serving-calculate-locally-then-log)
+and [runnable portion example](examples/portions/main.py).
 
 ## Server-only APIs
 
-These root methods retain the OpenAPI names in Python snake_case and are not
-available on a user-bound view. The following are **independent fragments, not a
-sequence to run together**. Each assumes `client` is a configured `January` and
-`authenticated_user_id` comes from your backend. The client-token feature must
-be enabled for your partner account before minting client tokens: open
+`client.credits()`, `client.mint_client_token(...)` and
+`client.revoke_client_tokens(...)` operate on the root client, never a user view.
+
+For client-token minting, first open
 [Client tokens](https://dashboard.january.ai/dashboard/client-tokens) and choose
-**Enable client tokens**, then mint on your backend. This optional setup is not
-required for the server food-search quickstart.
+**Enable client tokens** for your partner account. Mint on your backend with the
+authenticated user's ID; optionally supply `scopes=["foods:read"]` and
+`ttl_seconds=1800`. Return the token only to that authenticated user, never to logs.
 
-Check the credit balance independently:
+Revoke separately when intentionally invalidating that user's tokens—not
+immediately after minting. Revocation makes one DELETE request and exposes
+`revoked_count` on the returned metadata. It is never automatically retried.
 
-```python
-balance = client.credits()
-```
+For mobile/web integration, see the [authenticated token-relay example](examples/fastapi/README.md).
 
-Mint a token when issuing credentials to your authenticated client:
+## Async usage
 
-```python
-token = client.mint_client_token(
-    end_user_id=authenticated_user_id, scopes=["foods:read"], ttl_seconds=1800,
-)
-```
+Use `AsyncJanuary` with an async context manager and `await` the same resource
+methods. User views, models and error types are shared with the sync client.
+The client works with asyncio and Trio; cancellation propagates through requests
+and retry waits.
 
-Return it only to that authenticated user; never log it. Do not immediately
-revoke a newly minted token. Revoke separately when intentionally invalidating
-that user's client tokens:
+Copy the complete [async quickstart](examples/quickstart/async_main.py) to
+`quickstart_async.py`, then run `python quickstart_async.py` with the same `.env`.
+For multiple photos, see the [bounded-concurrency example](examples/analysis/concurrent.py).
 
-```python
-revoked = client.revoke_client_tokens(end_user_id=authenticated_user_id)
-```
+## Errors and retries
 
-Revocation is one DELETE with `end_user_id` in the query, returning
-`revoked.revoked_count` from `X-Revoked-Count`. There is no revoke-all loop.
+Catch specific API errors when your application can act on them:
 
-## Configuration and errors
-
-- Pass `secret_key=` explicitly. Client-token `ct-` credentials are rejected.
-- The SDK does not read credentials or files automatically. Loading local `.env`
-  is application behavior in the quickstarts, using the example-only `python-dotenv` dependency.
-- Default timeout is 30 seconds; client/per-call `timeout=` overrides it.
-  Async calls support task cancellation; sync calls accept `cancel_event=`
-  and observe it at the next read/timeout.
-- No automatic retries, pagination, or invented idempotency headers.
-- Requests use the built-in production endpoint over HTTPS; redirects are not followed.
-- Responses expose `.response` metadata; revocation returns it directly.
-  `JanuaryAPIError` preserves `code`, `status_code`, `docs_url`, and
-  `request_id`. Connection, timeout, cancellation, and decoding errors have
-  separate types. Never print raw error bodies or token models.
-- Omitted values remain unset; explicit `None` is sent only where nullable.
-  Aware datetime inputs serialize to UTC; response timestamps remain strings.
-
-### Troubleshooting
-
-| Symptom | Next step |
+| Error | What to do |
 | --- | --- |
-| Missing/invalid key before any HTTP request | Set the full `sk-` key in `JANUARY_API_KEY`; a dashboard login or `ct-` token is not a server key. |
-| HTTP 401 | Check that the key is complete, active, and belongs to the intended organization. |
-| HTTP 403 | Check organization access and key permissions. For token minting only, also check that **Enable client tokens** is enabled; server food search does not require it. |
-| HTTP 429, `rate_limited` | Wait before another attempt. There are no automatic retries. |
-| HTTP 429, `credit_limit_exceeded` | Check [Billing](https://dashboard.january.ai/billing) for the current plan/allowance and use root `credits()` for balance. Do not treat this as a rate-limit retry. |
-| `transport_timeout` / `transport_connection` | Check connectivity. The default request timeout is 30 seconds; an interrupted request may still have reached the service. |
+| `BadRequestError` | Check the request parameters |
+| `AuthenticationError` | Check that the server key is valid and active |
+| `PermissionDeniedError` | Check permissions; token minting also requires enabling client tokens |
+| `NotFoundError` | Check the resource identifier |
+| `PayloadTooLargeError` | Reduce or prepare the image |
+| `RateLimitError` | Respect `retry_after` when retries are exhausted |
+| `CreditLimitExceededError` | Check [Billing](https://dashboard.january.ai/billing); retrying will not fix an exhausted allowance |
+| `InternalServerError` | Handle a server or upstream failure |
 
-For example, an API failure can produce these safe diagnostics (illustrative,
-not an additional request):
+All of these inherit from `JanuaryAPIError`. Errors expose safe metadata such as
+`status_code`, `code` and `request_id`; exception strings do not dump credentials.
+Do not log keys, tokens or food payloads.
 
-```text
-Food search failed: {"status": 429, "code": "rate_limited", "request_id": "req-example"}
-Hint: Wait before trying again; this example does not retry automatically.
-```
+Clients default to two bounded, error-code-aware retries with jitter and
+Retry-After support. Permanent errors and credit exhaustion are not retried.
+Token minting and food-log creation are not replayed after ambiguous network
+failures or 5xx responses. Retried analysis calls may consume additional credits.
 
-The examples use only the SDK's credential-redacted metadata and JSON-escape
-the fields. Share those fields with [support@january.ai](mailto:support@january.ai)
-if needed, not raw errors, payloads, headers, keys, or client tokens.
+Defaults are 60 seconds per call and 120 seconds for analysis, with a 5-second
+connection timeout. Override using `timeout=`; use `max_retries=0` for one attempt.
+See [configuration and error details](docs/configuration.md) for retry budgets,
+HTTPX phase timeouts, cancellation and transport error types.
 
-## Examples and testing
+## Configuration and type safety
 
-To run the repository examples, follow the [contributor setup](CONTRIBUTING.md#setup-and-offline-verification),
-then run these commands from the repository root with its virtual environment active:
+The only required configuration is your API key. `January()` reads
+`JANUARY_API_KEY`; `api_key=` overrides it. Existing `secret_key=` calls remain
+supported, but do not supply both. Production is built in.
 
-- [Food search](examples/quickstart/main.py): `python examples/quickstart/main.py`.
-- [Async food search](examples/quickstart/async_main.py): `python examples/quickstart/async_main.py`.
-- [Offline FoodPortion](examples/portions/main.py): `python examples/portions/main.py`
-  (fake food, no key or network).
-- [Live all-operation demo](docs/live-testing.md): separate opt-in setup, environment
-  file rules, credit usage, result reports, and cleanup details.
+Reuse a context-managed client. If you provide an HTTPX client, your application
+owns closing it. `default_headers=` can add tracing headers, not override identity.
 
-Normal CI tests both quickstarts as real subprocesses against localhost with
-fake credentials and test-owned transport injection. It never runs these examples against production.
-See [CONTRIBUTING.md](CONTRIBUTING.md) for test setup and focused commands.
+Models are typed and preserve unknown response fields. Passing returned
+detections into a correction preserves those additions; arbitrary request
+dictionaries still undergo strict validation. Omitted fields stay omitted, and
+`None` is accepted only where the contract allows null.
 
-## Distribution
+Use `model_dump(mode="json", exclude_unset=True)` for JSON-ready output that
+preserves omissions. See [configuration and type-safety details](docs/configuration.md)
+for native datetimes and parsed accessors that preserve opaque timestamps.
 
-`januaryai-server` is distributed through PyPI as a wheel (`.whl`) and source
-distribution (`.tar.gz`). Install it with `pip`; import it as `januaryai`.
-Type information is included for editor completion and static checking.
-Record the package version in your project's dependency file or lockfile for
-reproducible environments. See [distribution checks](CONTRIBUTING.md#build-and-verify-distributions)
-for contributor build and installation tests.
+## Examples
 
-## Reference, support, and contributing
+| Example or guide | Start here |
+| --- | --- |
+| One-request quickstart | [minimal.py](examples/quickstart/minimal.py) |
+| Food search with error handling | [Sync](examples/quickstart/main.py) · [Async](examples/quickstart/async_main.py) |
+| Analyze, correct and log; select a serving and log | [Workflow recipes](docs/recipes.md) |
+| Concurrent photo analysis | [concurrent.py](examples/analysis/concurrent.py) |
+| Local portion calculation | [main.py](examples/portions/main.py) |
+| Issue client tokens from your backend | [FastAPI example](examples/fastapi/README.md) |
 
-- [January Swagger API reference](https://partners.january.ai/v1.2/docs#/).
-- [Generated Python models](src/januaryai/models.py).
-- [Contributor setup, contract generation, and compatibility notes](CONTRIBUTING.md).
+Follow the [quickstart setup](#quickstart), then run examples from the directory
+containing your `.env` file. The FastAPI example includes its own setup instructions.
 
-For support, email [support@january.ai](mailto:support@january.ai) with a minimal reproduction
-plus safe request IDs—never credentials or private payloads.
+## Versioning and contributing
+
+The SDK targets API `/v1.2`; package versions are separate from API versions.
+See the [changelog](CHANGELOG.md) before upgrading and pin a compatible package
+version in your application.
+
+To contribute a fix, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License and support
+
+Released under the [MIT license](LICENSE). For help, contact
+[support@january.ai](mailto:support@january.ai) with a minimal reproduction and
+safe request IDs. Report sensitive issues privately using the
+[security policy](SECURITY.md).

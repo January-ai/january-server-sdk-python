@@ -4,17 +4,32 @@ build-backend = "hatchling.build"
 
 [project]
 name = "januaryai-server"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Typed January server SDK generated from the partner API contract"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["httpx>=0.27,<1", "pydantic>=2.10,<3", "typing-extensions>=4.12,<5"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "January AI", email = "support@january.ai"}]
+keywords = ["nutrition", "food", "glucose", "api", "sdk"]
+classifiers = [
+  "Intended Audience :: Developers", "Typing :: Typed",
+  "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13", "Programming Language :: Python :: 3.14",
+]
+dependencies = ["httpx>=0.27,<1", "pydantic>=2.10,<3", "typing-extensions>=4.12,<5", "pillow>=10", "anyio>=4,<5"]
 
 [project.urls]
 Documentation = "https://partners.january.ai/v1.2/docs#/"
+Homepage = "https://january.ai"
+Repository = "https://github.com/January-ai/january-server-sdk-python"
+Issues = "https://github.com/January-ai/january-server-sdk-python/issues"
 
 [project.optional-dependencies]
-test = ["pytest>=8.0", "pyright>=1.1.400", "build>=1.2", "python-dotenv>=1.0", "fastapi>=0.115,<1"]
+test = ["pytest>=8.0", "pytest-cov>=6", "pyright>=1.1.400", "build>=1.2", "twine>=6", "ruff>=0.11", "trio>=0.27", "python-dotenv>=1.0", "fastapi>=0.115,<1"]
+
+[tool.hatch.version]
+path = "src/januaryai/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/januaryai"]
@@ -28,7 +43,25 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.pyright]
-include = ["src", "tests/typecheck.py", "examples/quickstart"]
-typeCheckingMode = "strict"
+include = ["src", "tests", "examples", "scripts"]
+typeCheckingMode = "standard"
+strict = ["src", "tests/typecheck.py", "examples/quickstart"]
 pythonVersion = "3.11"
 reportUnnecessaryIsInstance = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["src/januaryai/_generated.py", "src/januaryai/models.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+# Formatting owns wrapping; generated projections retain deterministic formatting.
+ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["januaryai"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true

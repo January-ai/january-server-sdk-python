@@ -1,24 +1,54 @@
 name: Python SDK checks
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
 permissions:
   contents: read
 jobs:
-  test-package:
+  lint-and-types:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ['3.11', '3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[test]'
+      - run: ruff check src tests examples scripts
+      - run: ruff format --check src tests examples scripts
+      - run: pyright
+  test-package:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ['3.11', '3.12', '3.13', '3.14']
+        include:
+          - os: macos-latest
+            python: '3.12'
+          - os: windows-latest
+            python: '3.12'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -e '.[test]'
-      - run: python -m pytest -q
-      - run: pyright
+      - run: python -m pytest --cov=januaryai --cov-report=term-missing --cov-report=xml
       - run: python -m build
-      - name: Install wheel and exercise loopback HTTP service
-        run: |
-          python -m venv /tmp/january-wheel-consumer
-          /tmp/january-wheel-consumer/bin/python -m pip install dist/*.whl
-          /tmp/january-wheel-consumer/bin/python -I tests/installed_consumer.py
+      - run: python -m twine check dist/*.whl dist/*.tar.gz
+        shell: bash
+      - name: Verify package contents and secret exclusions
+        run: python scripts/check-distribution.py dist/*.whl dist/*.tar.gz
+        shell: bash
+      - name: Install distributions and exercise real loopback HTTP
+        run: python scripts/test-installed.py
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.os }}-${{ matrix.python }}
+          path: coverage.xml
+          retention-days: 7
