@@ -70,7 +70,7 @@ async def main() -> int:
 
     print(f"Foods returned: {len(foods.items)}")
     if foods.items:
-        name = foods.items[0].name.replace(key, "[redacted]")
+        name = (foods.items[0].name or "Unnamed food").replace(key, "[redacted]")
         print(f"First food: {name}")
     else:
         print("No foods found for banana.")

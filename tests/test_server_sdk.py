@@ -49,13 +49,13 @@ def test_all_operations(fixture, async_mode):
                 result = method(client, fixture)(**arguments(fixture))
         assert len(service["requests"]) == 1
         assert_request(service["requests"][0], fixture)
-        if fixture["operationId"] == "revokeClientTokens":
+        if fixture["operationId"] == "deleteFoodLog":
             assert isinstance(result, ResponseMetadata)
             assert result.status_code == 204
-            assert result.revoked_count == 3
         else:
             assert (
-                result.model_dump(by_alias=True, exclude_unset=True) == fixture["response"]["body"]
+                result.model_dump(by_alias=True, exclude_unset=True, mode="json")
+                == fixture["response"]["body"]
             )
             assert result.response.request_id == fixture["response"]["headers"]["x-request-id"]
 
@@ -70,7 +70,7 @@ def test_structured_errors_never_retry(error, async_mode):
             async with AsyncJanuary(
                 max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
             ) as client:
-                await client.credits()
+                await client.get_credits()
 
         with pytest.raises(JanuaryAPIError) as caught:
             if async_mode:
@@ -79,7 +79,7 @@ def test_structured_errors_never_retry(error, async_mode):
                 with January(
                     max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
                 ) as client:
-                    client.credits()
+                    client.get_credits()
         e = caught.value
         assert e.code == error["body"]["code"]
         assert e.docs_url == error["body"]["docs_url"]
@@ -90,47 +90,65 @@ def test_structured_errors_never_retry(error, async_mode):
 
 def test_root_surface_and_immutable_user_views():
     with local_service() as service:
-        fixture = FIXTURES["operations"][0]
+        fixture = next(f for f in FIXTURES["operations"] if f["operationId"] == "listFoodLogs")
         service["response"] = fixture["response"]
         with January(
             max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
         ) as client:
             a, b = client.for_user("alice"), client.for_user("bob")
-            for name in ["mint_client_token", "revoke_client_tokens", "credits", "client_tokens"]:
+            for name in [
+                "create_client_token",
+                "revoke_client_tokens",
+                "get_credits",
+                "client_tokens",
+            ]:
                 assert not hasattr(a, name)
             with pytest.raises(FrozenInstanceError):
                 a._context = {}  # pyright: ignore[reportAttributeAccessIssue] -- intentionally test immutable assignment
             with pytest.raises(TypeError):
                 a._context["end_user_id"] = "bob"  # pyright: ignore[reportIndexIssue] -- intentionally test immutable mapping
-            a.foods.search(query="eggs")
-            b.foods.search(query="eggs")
-            client.foods.search(query="eggs")
-            assert [r["headers"].get("x-end-user-id") for r in service["requests"]] == [
+            a.food_logs.list(start_date="2026-08-01", end_date="2026-08-30", timezone="UTC")
+            b.food_logs.list(start_date="2026-08-01", end_date="2026-08-30", timezone="UTC")
+            client.food_logs.list(start_date="2026-08-01", end_date="2026-08-30", timezone="UTC")
+            assert [r["headers"].get("january-end-user-id") for r in service["requests"]] == [
                 "alice",
                 "bob",
                 None,
             ]
-            a.foods.search(query="eggs", end_user_id="bob")
-            assert service["requests"][-1]["headers"]["x-end-user-id"] == "alice"
-            client.for_user("user-" + "x" * 100).foods.search(query="eggs")
-            assert len(service["requests"][-1]["headers"]["x-end-user-id"]) > 64
+            a.food_logs.list(
+                start_date="2026-08-01",
+                end_date="2026-08-30",
+                timezone="UTC",
+                end_user_id="bob",
+            )
+            assert service["requests"][-1]["headers"]["january-end-user-id"] == "alice"
+            client.for_user("user-" + "x" * 100).food_logs.list(
+                start_date="2026-08-01", end_date="2026-08-30", timezone="UTC"
+            )
+            assert len(service["requests"][-1]["headers"]["january-end-user-id"]) > 64
             assert not hasattr(client, "revoke_all_for_user")
 
 
 def test_async_user_context_is_concurrency_safe():
     with local_service() as service:
-        service["response"] = FIXTURES["operations"][0]["response"]
+        fixture = next(f for f in FIXTURES["operations"] if f["operationId"] == "listFoodLogs")
+        service["response"] = fixture["response"]
 
         async def run():
             async with AsyncJanuary(
                 max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
             ) as client:
                 await asyncio.gather(
-                    *(client.for_user(str(i)).foods.search(query="eggs") for i in range(10))
+                    *(
+                        client.for_user(str(i)).food_logs.list(
+                            start_date="2026-08-01", end_date="2026-08-30", timezone="UTC"
+                        )
+                        for i in range(10)
+                    )
                 )
 
         asyncio.run(run())
-        assert {r["headers"]["x-end-user-id"] for r in service["requests"]} == {
+        assert {r["headers"]["january-end-user-id"] for r in service["requests"]} == {
             str(i) for i in range(10)
         }
 
@@ -139,7 +157,7 @@ def test_single_revoke_even_at_500_and_encoding():
     fixture = deepcopy(
         next(f for f in FIXTURES["operations"] if f["operationId"] == "revokeClientTokens")
     )
-    fixture["response"]["headers"]["X-Revoked-Count"] = "500"
+    fixture["response"]["body"]["revoked_count"] = 500
     with local_service() as service:
         service["response"] = fixture["response"]
         with January(
@@ -149,8 +167,8 @@ def test_single_revoke_even_at_500_and_encoding():
         assert result.revoked_count == 500
         assert len(service["requests"]) == 1
         request = service["requests"][0]
-        assert request["body"] is None
-        assert parse_qs(urlsplit(request["path"]).query) == {"end_user_id": ["user & + / ?"]}
+        assert request["body"] == {"end_user_id": "user & + / ?"}
+        assert parse_qs(urlsplit(request["path"]).query) == {}
 
 
 def test_path_encoding_and_date_serialization():
@@ -165,13 +183,13 @@ def test_path_encoding_and_date_serialization():
             )
         request = service["requests"][0]
         assert request["path"].endswith("/a%2Fb%20%3F%23")
-        assert request["headers"]["x-end-user-timezone"] == "America/New_York"
+        assert "january-end-user-timezone" not in request["headers"]
         assert request["body"] == {"name": "Lunch"}
 
 
 def test_forward_compatible_responses_and_redaction():
     fixture = deepcopy(
-        next(f for f in FIXTURES["operations"] if f["operationId"] == "mintClientToken")
+        next(f for f in FIXTURES["operations"] if f["operationId"] == "createClientToken")
     )
     fixture["response"]["body"]["scopes"] = ["future:scope"]
     fixture["response"]["body"]["future"] = "sensitive-extra"
@@ -180,7 +198,7 @@ def test_forward_compatible_responses_and_redaction():
         with January(
             max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
         ) as client:
-            result = client.mint_client_token(end_user_id="user")
+            result = client.create_client_token(end_user_id="user", scopes=["foods:read"])
             assert result.scopes == ["future:scope"]
             assert result.model_dump()["future"] == "sensitive-extra"
             assert "sensitive-extra" not in repr(result)
@@ -192,12 +210,12 @@ def test_forward_compatible_responses_and_redaction():
                 "body": {
                     "code": "bad_input",
                     "docs_url": "https://example.com/docs",
-                    "message": "sk-local-fixture private-user private meal",
+                    "message": "sk-local-fixture private meal",
                 },
             }
             with pytest.raises(JanuaryAPIError) as caught:
-                client.food_analysis.analyze_description(
-                    query="private meal", end_user_id="private-user"
+                client.for_user("private-user").food_analysis.analyze_description(
+                    query="private meal"
                 )
             assert "private" not in str(caught.value)
             assert "private" not in caught.value.message
@@ -209,9 +227,9 @@ def test_uncapped_balance():
         with January(
             max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
         ) as client:
-            result = client.credits()
+            result = client.get_credits()
         assert result.remaining_credits is None
-        assert "remaining_credits" not in result.model_fields_set
+        assert "remaining_credits" in result.model_fields_set
 
 
 def test_short_query_preserves_machine_metadata_and_filters_credentials():
@@ -266,9 +284,14 @@ def test_unset_null_and_typed_models():
         )
         == {}
     )
-    assert models.FoodLog(id="log", foods=[], timestamp_utc="opaque").model_dump(
-        exclude_unset=True
-    ) == {"id": "log", "foods": [], "timestamp_utc": "opaque"}
+    assert models.FoodLog(
+        id="log", foods=[], eaten_at=datetime(2026, 8, 30, tzinfo=UTC), name=None
+    ).model_dump(exclude_unset=True) == {
+        "id": "log",
+        "foods": [],
+        "eaten_at": datetime(2026, 8, 30, tzinfo=UTC),
+        "name": None,
+    }
     fixture = next(f for f in FIXTURES["operations"] if f["operationId"] == "createFoodLog")
     with local_service() as service:
         service["response"] = fixture["response"]
@@ -276,16 +299,12 @@ def test_unset_null_and_typed_models():
             max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
         ) as client:
             client.for_user("user").food_logs.create(
-                foods=[
-                    models.FoodLogInputFood(
-                        id=12, serving=models.FoodLogInputServing(id=5, quantity=1)
-                    )
-                ],
-                timestamp_utc=datetime(2026, 8, 30, tzinfo=UTC),
+                foods=[models.FoodLogInputFood(food_id="12", serving_id="5", quantity=1)],
+                eaten_at=datetime(2026, 8, 30, tzinfo=UTC),
             )
             assert service["requests"][-1]["body"] == {
-                "foods": [{"id": 12, "serving": {"id": 5, "quantity": 1}}],
-                "timestamp_utc": "2026-08-30T00:00:00Z",
+                "foods": [{"food_id": "12", "serving_id": "5", "quantity": 1}],
+                "eaten_at": "2026-08-30T00:00:00Z",
             }
             with pytest.raises(JanuaryValidationError):
                 client.for_user("user").food_logs.update(log_id="log", name=None)  # pyright: ignore[reportArgumentType] -- intentionally invalid null
@@ -308,7 +327,7 @@ def test_timeout_cancellation_and_no_retry():
     with local_service() as service:
         release = service["response_gate"] = Event()
         service["response"] = next(
-            f for f in FIXTURES["operations"] if f["operationId"] == "credits"
+            f for f in FIXTURES["operations"] if f["operationId"] == "getCredits"
         )["response"]
 
         async def timeout():
@@ -316,18 +335,18 @@ def test_timeout_cancellation_and_no_retry():
                 max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
             ) as client:
                 with pytest.raises(JanuaryTimeoutError):
-                    await client.credits(timeout=0.01)
+                    await client.get_credits(timeout=0.01)
 
         try:
             with January(
                 max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
             ) as client:
                 with pytest.raises(JanuaryTimeoutError):
-                    client.credits(timeout=0.01)
+                    client.get_credits(timeout=0.01)
                 event = Event()
                 event.set()
                 with pytest.raises(JanuaryCancelledError):
-                    client.credits(cancel_event=event)
+                    client.get_credits(cancel_event=event)
 
             asyncio.run(timeout())
         finally:
@@ -342,7 +361,7 @@ def test_timeout_cancellation_and_no_retry():
             async with AsyncJanuary(
                 max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]
             ) as client:
-                task = asyncio.create_task(client.credits())
+                task = asyncio.create_task(client.get_credits())
                 try:
                     assert await asyncio.to_thread(received.wait, 10)
                     task.cancel()
@@ -369,7 +388,7 @@ def test_redirects_not_followed_and_injected_transport_not_closed():
             January(max_retries=0, secret_key="sk-local-fixture", http_client=transport) as client,
             pytest.raises(JanuaryError, match="redirect"),
         ):
-            client.credits()
+            client.get_credits()
         assert not transport.is_closed
     assert len(requests) == 1
 
@@ -380,14 +399,14 @@ def test_malformed_response_and_validation_before_network():
         January(max_retries=0, secret_key="sk-local-fixture", base_url=service["url"]) as client,
     ):
         with pytest.raises(JanuaryResponseError):
-            client.credits()
+            client.get_credits()
         with pytest.raises(JanuaryValidationError):
-            client.mint_client_token(end_user_id="user", ttl_seconds=299)
+            client.create_client_token(end_user_id="user", scopes=["foods:read"], ttl_seconds=299)
         with pytest.raises(JanuaryValidationError):
-            client.foods.lookup_barcode(upc="nope")
-        with pytest.raises(JanuaryValidationError):
-            client.food_logs.list(start="2026-08-01", end="2026-08-30")
-        assert len(service["requests"]) == 1
+            client.foods.lookup_barcode(barcode="nope")
+        with pytest.raises(JanuaryResponseError):
+            client.food_logs.list(start_date="2026-08-01", end_date="2026-08-30", timezone="UTC")
+        assert len(service["requests"]) == 2
 
 
 def test_manifest_matches_public_methods():
@@ -395,7 +414,7 @@ def test_manifest_matches_public_methods():
         Path(__file__).parents[1].joinpath("sdk-surface.json").read_text(encoding="utf-8")
     )
     assert manifest["language"] == "python"
-    assert len(manifest["operations"]) == 18
+    assert len(manifest["operations"]) == 20
     for client_type in [January, AsyncJanuary]:
         client = client_type(secret_key="sk-local-fixture")
         for op in manifest["operations"]:

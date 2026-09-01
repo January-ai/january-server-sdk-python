@@ -10,7 +10,6 @@ from typing import Literal
 from .models import (
     FoodId,
     FoodLogInputFood,
-    FoodLogInputServing,
     FoodSearchItem,
     NutrientAmount,
     NutritionFacts,
@@ -34,7 +33,7 @@ class FoodPortionError(ValueError):
         self.code: FoodPortionErrorCode = code
 
 
-def _positive_finite(value: float) -> bool:
+def _positive_finite(value: object) -> bool:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
     try:
@@ -89,8 +88,14 @@ class FoodPortion:
             )
         if selected is None:
             raise FoodPortionError("serving_not_found")
-        if not _positive_finite(selected.quantity) or not _positive_finite(selected.scaling_factor):
+        if (
+            selected.id is None
+            or not _positive_finite(selected.quantity)
+            or not _positive_finite(selected.scaling_factor)
+        ):
             raise FoodPortionError("invalid_serving")
+        assert selected.quantity is not None
+        assert selected.scaling_factor is not None
         requested = selected.quantity if quantity is None else quantity
         if not _positive_finite(requested) or requested > 10_000:
             raise FoodPortionError("invalid_quantity")
@@ -107,7 +112,5 @@ class FoodPortion:
             ),
             glycemic_index=food.glycemic_index,
             glycemic_load=None if food.glycemic_load is None else food.glycemic_load * scale,
-            selection=FoodLogInputFood(
-                id=food.id, serving=FoodLogInputServing(id=selected.id, quantity=requested)
-            ),
+            selection=FoodLogInputFood(food_id=food.id, serving_id=selected.id, quantity=requested),
         )

@@ -142,26 +142,18 @@ def test_parsed_detection_correction_preserves_omitted_nutrients(case, async_mod
 
             request = arguments(correction_operation)
             # Pass actual parsed models back to the SDK, not reconstructed dictionaries.
-            request["detections"] = photo.detections
-            if photo.meal_name is not None:
-                request["meal_name"] = photo.meal_name
-            else:
-                request.pop("meal_name", None)
+            request["analysis"] = photo
 
             expected_request = deepcopy(correction_operation)
-            expected_request["request"]["body"]["detections"] = photo.model_dump(
+            expected_request["request"]["body"]["analysis"] = photo.model_dump(
                 by_alias=True, exclude_unset=True
-            )["detections"]
-            if photo.meal_name is not None:
-                expected_request["request"]["body"]["meal_name"] = photo.meal_name
-            else:
-                expected_request["request"]["body"].pop("meal_name", None)
+            )
 
             service["response"] = correction_case["response"]
             corrected = await call(client.food_analysis.correct, **request)
             assert len(service["requests"]) == 2  # Exactly one photo and one correction call.
             assert_request(service["requests"][1], expected_request)
-            for detection in service["requests"][1]["body"]["detections"]:
+            for detection in service["requests"][1]["body"]["analysis"]["detections"]:
                 assert detection["food"]["nutrients"] == case["expectedNutrients"]
             assert_nutrient_presence(corrected, correction_case)
 

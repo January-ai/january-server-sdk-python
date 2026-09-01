@@ -12,7 +12,7 @@ def validate_create_input(request: CreateClientTokenInput) -> None:
         )
     if len(request.end_user_id.strip().encode("utf-16-le", errors="surrogatepass")) // 2 > 64:
         raise JanuaryValidationError("end_user_id must be at most 64 UTF-16 code units")
-    if request.scopes is not None and (
+    if (
         isinstance(request.scopes, (str, bytes))
         or not 1 <= len(request.scopes) <= 6
         or any(scope not in get_args(ClientScope) for scope in request.scopes)

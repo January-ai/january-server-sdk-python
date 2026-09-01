@@ -84,7 +84,7 @@ def relay(tmp_path, monkeypatch, capsys, caplog, request):
     monkeypatch.setattr(httpx, "AsyncClient", sdk_http_client)
 
     def forbid_prototype_alias(*args, **kwargs):
-        raise AssertionError("The relay must call canonical mint_client_token")
+        raise AssertionError("The relay must call canonical create_client_token")
 
     monkeypatch.setattr(AsyncJanuary, "client_tokens", property(forbid_prototype_alias))
     spec = importlib.util.spec_from_file_location(

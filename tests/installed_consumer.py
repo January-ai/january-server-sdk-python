@@ -20,7 +20,8 @@ FIXTURES = json.loads(
 
 
 def snake(value):
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value).replace("-", "_").lower()
+    result = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value).replace("-", "_").lower()
+    return "type_" if result == "type" else result
 
 
 def arguments(fixture):
@@ -113,15 +114,24 @@ def main():
         "Consumer must use installed wheel, not source"
     )
     food = models.FoodSearchItem(
-        id=42,
+        id="42",
+        type="generic",
         name="Offline portion food",
+        brand_name=None,
+        image_url=None,
+        barcode=None,
         nutrients=models.NutritionFacts(
             calories=models.NutrientAmount(value=100, unit="cal"),
             protein=models.NutrientAmount(value=0, unit="g"),
         ),
         servings=[
             models.ServingOption(
-                id=2, quantity=2, unit="pieces", scaling_factor=3, weight_grams=120, is_primary=True
+                id="2",
+                quantity=2,
+                unit="pieces",
+                scaling_factor=3,
+                weight_grams=120,
+                is_primary=True,
             )
         ],
         glycemic_index=50,
@@ -134,7 +144,11 @@ def main():
     }
     assert portion.total_weight_grams == 240
     assert portion.glycemic_index == 50 and portion.glycemic_load == 48
-    assert portion.selection.model_dump() == {"id": 42, "serving": {"id": 2, "quantity": 4}}
+    assert portion.selection.model_dump() == {
+        "food_id": "42",
+        "serving_id": "2",
+        "quantity": 4,
+    }
     assert models.CreateFoodLogBody(foods=[portion.selection]).foods[0] == portion.selection
     try:
         FoodPortion.from_food(food, quantity=0)
@@ -160,7 +174,7 @@ def main():
                     assert_request(service["requests"][-1], fixture)
 
         asyncio.run(run())
-        assert len(service["requests"]) == 36
+        assert len(service["requests"]) == 40
         from PIL import Image
 
         fixtures = {item["operationId"]: item for item in FIXTURES["operations"]}
@@ -172,18 +186,20 @@ def main():
             analysis_response,
             analysis_response,
             {"status": 429, "body": {"code": "rate_limited"}, "headers": {"retry-after": "0"}},
-            fixtures["credits"]["response"],
+            fixtures["getCredits"]["response"],
         ]
         with January(api_key="sk-local-fixture", base_url=service["url"]) as client:
             user = client.for_user("installed-photo-test")
             analysis = user.food_analysis.analyze_photo(image=photo.getvalue())
             assert service["requests"][-1]["body"]["image"].startswith("data:image/jpeg;base64,")
-            user.food_analysis.correct(detections=analysis.detections, user_input="smaller portion")
-            assert service["requests"][-1]["body"]["detections"][0]["future_field"] == {"value": 7}
-            assert isinstance(client.credits(), models.CreditsResponseDto)
-        assert len(service["requests"]) == 40 and not service["responses"]
+            user.food_analysis.correct(analysis=analysis, instruction="smaller portion")
+            assert service["requests"][-1]["body"]["analysis"]["detections"][0]["future_field"] == {
+                "value": 7
+            }
+            assert isinstance(client.get_credits(), models.CreditBalance)
+        assert len(service["requests"]) == 44 and not service["responses"]
     print(
-        "Installed package: FoodPortion, 18 sync + 18 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
+        "Installed package: FoodPortion, 20 sync + 20 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
     )
 
 

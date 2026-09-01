@@ -155,7 +155,7 @@ def test_each_endpoint_retry_safety_over_http(mode, fixture, status, code):
         ]
         never = fixture["operationId"] == "revokeClientTokens"
         ambiguous_write = (
-            fixture["operationId"] in {"mintClientToken", "createFoodLog"} and status == 503
+            fixture["operationId"] in {"createClientToken", "createFoodLog"} and status == 503
         )
         if never or ambiguous_write:
             with pytest.raises(JanuaryAPIError):
@@ -166,13 +166,13 @@ def test_each_endpoint_retry_safety_over_http(mode, fixture, status, code):
             assert len(service["requests"]) == 2
 
 
-@pytest.mark.parametrize("mode", MODES)
-@pytest.mark.parametrize("fixture", OPERATIONS, ids=lambda f: f["operationId"])
-def test_invalid_identity_stops_every_endpoint_before_http(mode, fixture):
+@pytest.mark.parametrize("client_type", [January, AsyncJanuary])
+def test_invalid_identity_stops_before_http(client_type):
     with local_service() as service:
-        params = {**arguments(fixture), "end_user_id": {"not": "a string"}}
         with pytest.raises(JanuaryValidationError):
-            call(mode, service, fixture, params)
+            client_type(api_key="sk-local-fixture", base_url=service["url"]).for_user(
+                {"not": "a string"}  # pyright: ignore[reportArgumentType]
+            )
         assert service["requests"] == []
 
 
@@ -183,7 +183,8 @@ def test_invalid_identity_stops_every_endpoint_before_http(mode, fixture):
         pytest.param(fixture, failure, id=f"{fixture['operationId']}-{failure}")
         for fixture in OPERATIONS
         for failure in ("unexpected_status", "invalid_json", "invalid_shape")
-        if fixture["operationId"] != "revokeClientTokens" or failure == "unexpected_status"
+        if fixture["operationId"] not in {"revokeClientTokens", "deleteFoodLog"}
+        or failure == "unexpected_status"
     ],
 )
 def test_each_endpoint_rejects_bad_responses(mode, fixture, failure):

@@ -15,143 +15,145 @@ from ._runtime import AsyncResource, SyncResource, ResponseMetadata, UNSET, Unse
 class SyncFoods(SyncResource):
     def search(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
-        category: FoodCategoryInput | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        type_: FoodCategoryInput | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodSearchResults:
-        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: The food name to search for.\n    category: Narrows results to one food category.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchResults, self._transport.request(
-            "searchFoods", {"end_user_id": end_user_id, "query": query, "category": category, "limit": limit}, FoodSearchResults, self._context, timeout, cancel_event,
+            "searchFoods", {"query": query, "type_": type_, "limit": limit}, FoodSearchResults, self._context, timeout, cancel_event,
         ))
 
     def autocomplete(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
-        category: AutocompleteFoodCategoryInput | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        type_: AutocompleteFoodCategoryInput | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> AutocompleteFoodsResponse:
-        "Get food-name suggestions for a partial search query.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: The characters the user has typed so far. Fewer than 2 letters or digits yield no suggestions.\n    category: Narrows suggestions to one category. Omitted, generic and branded foods are suggested together, generic first.\n    limit: Maximum number of suggestions to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: AutocompleteFoodsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Get food-name suggestions for a partial search query.\n\nArgs:\n    query: The characters the user has typed so far. Fewer than 2 letters or digits yield no suggestions.\n    type_: Narrows suggestions to one kind of food. Omitted, generic and branded foods are suggested together, generic first.\n    limit: Maximum number of suggestions to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: AutocompleteFoodsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(AutocompleteFoodsResponse, self._transport.request(
-            "autocompleteFoods", {"end_user_id": end_user_id, "query": query, "category": category, "limit": limit}, AutocompleteFoodsResponse, self._context, timeout, cancel_event,
+            "autocompleteFoods", {"query": query, "type_": type_, "limit": limit}, AutocompleteFoodsResponse, self._context, timeout, cancel_event,
         ))
 
     def suggest_alternatives(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         food_id: FoodId,
         diet_restrictions: Sequence[DietRestrictionInput] | UnsetType = UNSET,
         diet_preferences: Sequence[DietPreferenceInput] | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> SuggestFoodAlternativesResponse:
-        "Find food alternatives filtered by dietary preferences and restrictions.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    food_id: Numeric food id from a search, scan, or detection result. The example is brown rice.\n    diet_restrictions: Allergens/ingredients to avoid. Omit it (or send []) if none apply.\n    diet_preferences: Dietary patterns to match. Omit it (or send []) if none apply.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SuggestFoodAlternativesResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find food alternatives filtered by dietary preferences and restrictions.\n\nArgs:\n    food_id: Food id from a search or food-analysis result. The example is brown rice.\n    diet_restrictions: Allergens/ingredients to avoid. Omit it (or send []) if none apply.\n    diet_preferences: Dietary patterns to match. Omit it (or send []) if none apply.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SuggestFoodAlternativesResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SuggestFoodAlternativesResponse, self._transport.request(
-            "suggestFoodAlternatives", {"end_user_id": end_user_id, "food_id": food_id, "diet_restrictions": diet_restrictions, "diet_preferences": diet_preferences}, SuggestFoodAlternativesResponse, self._context, timeout, cancel_event,
+            "suggestFoodAlternatives", {"food_id": food_id, "diet_restrictions": diet_restrictions, "diet_preferences": diet_preferences}, SuggestFoodAlternativesResponse, self._context, timeout, cancel_event,
         ))
 
     def lookup_barcode(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        upc: Barcode,
+        barcode: Barcode,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
-    ) -> FoodSearchResults:
-        "Look up a food by its barcode.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    upc: The numeric barcode: 6 to 14 digits (UPC-E, UPC-A, EAN-8, EAN-13 or GTIN-14). The example is a Coca-Cola can.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(FoodSearchResults, self._transport.request(
-            "lookupFoodByBarcode", {"end_user_id": end_user_id, "upc": upc}, FoodSearchResults, self._context, timeout, cancel_event,
+    ) -> FoodSearchItem:
+        "Look up a food by its barcode.\n\nArgs:\n    barcode: The numeric barcode: 6 to 14 digits (UPC-E, UPC-A, EAN-8, EAN-13 or GTIN-14). The example is a Coca-Cola can.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodSearchItem, self._transport.request(
+            "lookupFoodByBarcode", {"barcode": barcode}, FoodSearchItem, self._context, timeout, cancel_event,
         ))
 
     def get(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         food_id: FoodId,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodSearchItem:
-        "Get one food with its available servings and nutrition.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    food_id: Numeric food id from a search, scan, or detection result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Get one food with its available servings and nutrition.\n\nArgs:\n    food_id: Food id from a search or food-analysis result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchItem, self._transport.request(
-            "getFood", {"end_user_id": end_user_id, "food_id": food_id}, FoodSearchItem, self._context, timeout, cancel_event,
+            "getFood", {"food_id": food_id}, FoodSearchItem, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
 class SyncRestaurants(SyncResource):
     def search(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        radius: float | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        radius_meters: float | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         query: str,
         latitude: float,
         longitude: float,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> SearchRestaurantsResponse:
-        "Find restaurants near a latitude and longitude.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    radius: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).\n    limit: Maximum number of results to return.\n    query: Restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SearchRestaurantsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find restaurants near a latitude and longitude.\n\nArgs:\n    radius_meters: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. A fractional value is accepted and rounded. Default 8000 meters (about 5 miles); maximum 50000 (about 31 miles).\n    limit: Maximum number of results to return.\n    query: Restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SearchRestaurantsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SearchRestaurantsResponse, self._transport.request(
-            "searchRestaurants", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantsResponse, self._context, timeout, cancel_event,
+            "searchRestaurants", {"radius_meters": radius_meters, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantsResponse, self._context, timeout, cancel_event,
+        ))
+
+    def get_menu_items(
+        self, *,
+        limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
+        restaurant_id: str,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> GetRestaurantMenuItemsResponse:
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(GetRestaurantMenuItemsResponse, self._transport.request(
+            "getRestaurantMenuItems", {"limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
         ))
 
     def search_menu_items(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        radius: float | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        radius_meters: float | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         query: str,
         latitude: float,
         longitude: float,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> SearchRestaurantMenuItemsResponse:
-        "Find matching menu items across nearby restaurants.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    radius: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).\n    limit: Maximum number of results to return.\n    query: Dish or restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find matching menu items across nearby restaurants.\n\nArgs:\n    radius_meters: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. A fractional value is accepted and rounded. Default 8000 meters (about 5 miles); maximum 50000 (about 31 miles).\n    limit: Maximum number of results to return.\n    query: Dish or restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SearchRestaurantMenuItemsResponse, self._transport.request(
-            "searchRestaurantMenuItems", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
+            "searchRestaurantMenuItems", {"radius_meters": radius_meters, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
 class SyncFoodAnalysis(SyncResource):
     def analyze_photo(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         image: ImageInput,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
-            "scanFoodPhoto", {"end_user_id": end_user_id, "image": image, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
+            "scanFoodPhoto", {"image": image, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
         ))
 
     def analyze_description(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Analyze a written food description and return detected foods and quantities.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: Natural-language description of what was eaten; parsed into detected foods with quantities.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a written food description and return detected foods and quantities.\n\nArgs:\n    query: Natural-language description of what was eaten; parsed into detected foods with quantities.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
-            "searchFoodsByNaturalLanguage", {"end_user_id": end_user_id, "query": query}, FoodScan, self._context, timeout, cancel_event,
+            "searchFoodsByNaturalLanguage", {"query": query}, FoodScan, self._context, timeout, cancel_event,
         ))
 
     def correct(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        meal_name: str | UnsetType = UNSET,
-        detections: Sequence[FoodDetection | FoodDetectionInput],
-        user_input: str,
+        analysis: FoodScan | FoodScanInput,
+        instruction: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    meal_name: The meal name from the scan, when it returned one (photo scans do; text scans don't). Defaults to 'Meal'.\n    detections: Detections from a prior analysis. Returned typed models preserve additive response fields; arbitrary dictionaries remain validated.\n    user_input: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
-            "correctPhotoScan", {"end_user_id": end_user_id, "meal_name": meal_name, "detections": detections, "user_input": user_input}, FoodScan, self._context, timeout, cancel_event,
+            "correctPhotoScan", {"analysis": analysis, "instruction": instruction}, FoodScan, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
@@ -159,68 +161,76 @@ class SyncFoodLogs(SyncResource):
     def create(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput],
-        timestamp_utc: str | datetime | UnsetType = UNSET,
+        eaten_at: str | datetime | UnsetType = UNSET,
         name: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodLog:
-        "Log foods and selected serving quantities for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    foods: foods (required).\n    timestamp_utc: ISO timestamp or timezone-aware datetime; native values are serialized to UTC. Omit to retain server defaults.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        "Log foods and selected serving quantities for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    foods: foods (required).\n    eaten_at: When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
         return cast(FoodLog, self._transport.request(
-            "createFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "foods": foods, "timestamp_utc": timestamp_utc, "name": name}, FoodLog, self._context, timeout, cancel_event,
+            "createFoodLog", {"end_user_id": end_user_id, "foods": foods, "eaten_at": eaten_at, "name": name}, FoodLog, self._context, timeout, cancel_event,
         ))
 
     def list(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
-        start: str | date | datetime,
-        end: str | date | datetime,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    start: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers — required, so the upstream groups by the same days the caller means.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, self._transport.request(
-            "listFoodLogs", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "start": start, "end": end}, ListFoodLogsResponse, self._context, timeout, cancel_event,
+            "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout, cancel_event,
+        ))
+
+    def get(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        log_id: FoodLogId,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> FoodLog:
+        "Get one food log by ID.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodLog, self._transport.request(
+            "getFoodLog", {"end_user_id": end_user_id, "log_id": log_id}, FoodLog, self._context, timeout, cancel_event,
         ))
 
     def update(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         log_id: FoodLogId,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput] | UnsetType = UNSET,
-        timestamp_utc: str | datetime | UnsetType = UNSET,
+        eaten_at: str | datetime | UnsetType = UNSET,
         name: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodLog:
-        "Update the supplied fields of an existing food log.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    log_id: The log id returned when the log was created.\n    foods: foods (omit to use the server default).\n    timestamp_utc: ISO timestamp or timezone-aware datetime; native values are serialized to UTC. Omit to retain server defaults.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Update the supplied fields of an existing food log.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    foods: foods (omit to use the server default).\n    eaten_at: When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodLog, self._transport.request(
-            "updateFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "log_id": log_id, "foods": foods, "timestamp_utc": timestamp_utc, "name": name}, FoodLog, self._context, timeout, cancel_event,
+            "updateFoodLog", {"end_user_id": end_user_id, "log_id": log_id, "foods": foods, "eaten_at": eaten_at, "name": name}, FoodLog, self._context, timeout, cancel_event,
         ))
 
     def delete(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         log_id: FoodLogId,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
-    ) -> DeleteFoodLogResponse:
-        "Delete a food log belonging to an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: DeleteFoodLogResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(DeleteFoodLogResponse, self._transport.request(
-            "deleteFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "log_id": log_id}, DeleteFoodLogResponse, self._context, timeout, cancel_event,
+    ) -> ResponseMetadata:
+        "Delete a food log belonging to an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ResponseMetadata, self._transport.request(
+            "deleteFoodLog", {"end_user_id": end_user_id, "log_id": log_id}, ResponseMetadata, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
 class SyncGlucose(SyncResource):
     def predict(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         user_profile: GlucosePredictionProfile | GlucosePredictionProfileInput,
+        timezone: str,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput],
         start_time: str | datetime,
         cgm_data: Sequence[CgmReading | CgmReadingInput] | UnsetType = UNSET,
@@ -228,9 +238,9 @@ class SyncGlucose(SyncResource):
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> GlucosePrediction:
-        "Predict a glucose response from a user profile and selected foods.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    user_profile: user profile (required).\n    foods: The meal to predict the glucose response for.\n    start_time: When the meal is (or will be) eaten. Must carry a timezone designator.\n    cgm_data: Optional CGM history for personalization; requires consumed_foods.\n    consumed_foods: The meals eaten during the CGM history; requires cgm_data.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: GlucosePrediction.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Predict a glucose response from a user profile and selected foods.\n\nArgs:\n    user_profile: user profile (required).\n    timezone: The IANA timezone the end user is in. The prediction depends on the meal's local time of day.\n    foods: The meal to predict the glucose response for.\n    start_time: When the meal is (or will be) eaten. Must carry a timezone designator.\n    cgm_data: Optional CGM history, to personalize the prediction to this end user. Send it together with `consumed_foods` covering the same period — **at least 5 complete days of paired history**, which is what the model needs to train on them. Fewer is refused with `invalid_request`. Omit both fields for a standard prediction, which needs no sensor and no history.\n    consumed_foods: The meals eaten during the CGM history; requires cgm_data.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: GlucosePrediction.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(GlucosePrediction, self._transport.request(
-            "predictGlucose", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "user_profile": user_profile, "foods": foods, "start_time": start_time, "cgm_data": cgm_data, "consumed_foods": consumed_foods}, GlucosePrediction, self._context, timeout, cancel_event,
+            "predictGlucose", {"user_profile": user_profile, "timezone": timezone, "foods": foods, "start_time": start_time, "cgm_data": cgm_data, "consumed_foods": consumed_foods}, GlucosePrediction, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
@@ -257,17 +267,17 @@ class SyncShared(SyncResource):
 
 @dataclass(frozen=True, repr=False)
 class SyncRoot(SyncShared):
-    def mint_client_token(
+    def create_client_token(
         self, *,
         end_user_id: str,
-        scopes: Sequence[Literal["foods:read", "food_scans:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]] | UnsetType = UNSET,
-        ttl_seconds: float | UnsetType = UNSET,
+        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]],
+        ttl_seconds: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
-    ) -> ClientTokenResponseDto:
-        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. Omit to grant the full client-grantable set (foods:read, food_scans:write, food_logs:read, food_logs:write, glucose:read, restaurants:read). Grant only what the screen needs.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ClientTokenResponseDto.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
-        return cast(ClientTokenResponseDto, self._transport.request(
-            "mintClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientTokenResponseDto, self._context, timeout, cancel_event,
+    ) -> ClientToken:
+        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(ClientToken, self._transport.request(
+            "createClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientToken, self._context, timeout, cancel_event,
         ))
 
     def revoke_client_tokens(
@@ -275,154 +285,154 @@ class SyncRoot(SyncShared):
         end_user_id: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
-    ) -> ResponseMetadata:
-        "Revoke client tokens for an end user with one request; return response metadata.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nThis operation is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(ResponseMetadata, self._transport.request(
-            "revokeClientTokens", {"end_user_id": end_user_id}, ResponseMetadata, self._context, timeout, cancel_event,
+    ) -> ClientTokenRevocationResult:
+        "Revoke client tokens for an end user with one request.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ClientTokenRevocationResult.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nThis operation is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ClientTokenRevocationResult, self._transport.request(
+            "revokeClientTokens", {"end_user_id": end_user_id}, ClientTokenRevocationResult, self._context, timeout, cancel_event,
         ))
 
-    def credits(
+    def get_credits(
         self, *,
-        end_user_id: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
-    ) -> CreditsResponseDto:
-        "Get the account's credit balance and reset information.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: CreditsResponseDto.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(CreditsResponseDto, self._transport.request(
-            "credits", {"end_user_id": end_user_id}, CreditsResponseDto, self._context, timeout, cancel_event,
+    ) -> CreditBalance:
+        "Get the account's credit balance and reset information.\n\nArgs:\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: CreditBalance.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(CreditBalance, self._transport.request(
+            "getCredits", {}, CreditBalance, self._context, timeout, cancel_event,
         ))
 
 @dataclass(frozen=True, repr=False)
 class AsyncFoods(AsyncResource):
     async def search(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
-        category: FoodCategoryInput | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        type_: FoodCategoryInput | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodSearchResults:
-        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: The food name to search for.\n    category: Narrows results to one food category.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchResults, await self._transport.request(
-            "searchFoods", {"end_user_id": end_user_id, "query": query, "category": category, "limit": limit}, FoodSearchResults, self._context, timeout,
+            "searchFoods", {"query": query, "type_": type_, "limit": limit}, FoodSearchResults, self._context, timeout,
         ))
 
     async def autocomplete(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
-        category: AutocompleteFoodCategoryInput | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        type_: AutocompleteFoodCategoryInput | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> AutocompleteFoodsResponse:
-        "Get food-name suggestions for a partial search query.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: The characters the user has typed so far. Fewer than 2 letters or digits yield no suggestions.\n    category: Narrows suggestions to one category. Omitted, generic and branded foods are suggested together, generic first.\n    limit: Maximum number of suggestions to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: AutocompleteFoodsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Get food-name suggestions for a partial search query.\n\nArgs:\n    query: The characters the user has typed so far. Fewer than 2 letters or digits yield no suggestions.\n    type_: Narrows suggestions to one kind of food. Omitted, generic and branded foods are suggested together, generic first.\n    limit: Maximum number of suggestions to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: AutocompleteFoodsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(AutocompleteFoodsResponse, await self._transport.request(
-            "autocompleteFoods", {"end_user_id": end_user_id, "query": query, "category": category, "limit": limit}, AutocompleteFoodsResponse, self._context, timeout,
+            "autocompleteFoods", {"query": query, "type_": type_, "limit": limit}, AutocompleteFoodsResponse, self._context, timeout,
         ))
 
     async def suggest_alternatives(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         food_id: FoodId,
         diet_restrictions: Sequence[DietRestrictionInput] | UnsetType = UNSET,
         diet_preferences: Sequence[DietPreferenceInput] | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> SuggestFoodAlternativesResponse:
-        "Find food alternatives filtered by dietary preferences and restrictions.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    food_id: Numeric food id from a search, scan, or detection result. The example is brown rice.\n    diet_restrictions: Allergens/ingredients to avoid. Omit it (or send []) if none apply.\n    diet_preferences: Dietary patterns to match. Omit it (or send []) if none apply.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SuggestFoodAlternativesResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find food alternatives filtered by dietary preferences and restrictions.\n\nArgs:\n    food_id: Food id from a search or food-analysis result. The example is brown rice.\n    diet_restrictions: Allergens/ingredients to avoid. Omit it (or send []) if none apply.\n    diet_preferences: Dietary patterns to match. Omit it (or send []) if none apply.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SuggestFoodAlternativesResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SuggestFoodAlternativesResponse, await self._transport.request(
-            "suggestFoodAlternatives", {"end_user_id": end_user_id, "food_id": food_id, "diet_restrictions": diet_restrictions, "diet_preferences": diet_preferences}, SuggestFoodAlternativesResponse, self._context, timeout,
+            "suggestFoodAlternatives", {"food_id": food_id, "diet_restrictions": diet_restrictions, "diet_preferences": diet_preferences}, SuggestFoodAlternativesResponse, self._context, timeout,
         ))
 
     async def lookup_barcode(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        upc: Barcode,
+        barcode: Barcode,
         timeout: float | httpx.Timeout | None = None,
-    ) -> FoodSearchResults:
-        "Look up a food by its barcode.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    upc: The numeric barcode: 6 to 14 digits (UPC-E, UPC-A, EAN-8, EAN-13 or GTIN-14). The example is a Coca-Cola can.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(FoodSearchResults, await self._transport.request(
-            "lookupFoodByBarcode", {"end_user_id": end_user_id, "upc": upc}, FoodSearchResults, self._context, timeout,
+    ) -> FoodSearchItem:
+        "Look up a food by its barcode.\n\nArgs:\n    barcode: The numeric barcode: 6 to 14 digits (UPC-E, UPC-A, EAN-8, EAN-13 or GTIN-14). The example is a Coca-Cola can.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodSearchItem, await self._transport.request(
+            "lookupFoodByBarcode", {"barcode": barcode}, FoodSearchItem, self._context, timeout,
         ))
 
     async def get(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         food_id: FoodId,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodSearchItem:
-        "Get one food with its available servings and nutrition.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    food_id: Numeric food id from a search, scan, or detection result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Get one food with its available servings and nutrition.\n\nArgs:\n    food_id: Food id from a search or food-analysis result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchItem.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchItem, await self._transport.request(
-            "getFood", {"end_user_id": end_user_id, "food_id": food_id}, FoodSearchItem, self._context, timeout,
+            "getFood", {"food_id": food_id}, FoodSearchItem, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)
 class AsyncRestaurants(AsyncResource):
     async def search(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        radius: float | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        radius_meters: float | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         query: str,
         latitude: float,
         longitude: float,
         timeout: float | httpx.Timeout | None = None,
     ) -> SearchRestaurantsResponse:
-        "Find restaurants near a latitude and longitude.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    radius: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).\n    limit: Maximum number of results to return.\n    query: Restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find restaurants near a latitude and longitude.\n\nArgs:\n    radius_meters: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. A fractional value is accepted and rounded. Default 8000 meters (about 5 miles); maximum 50000 (about 31 miles).\n    limit: Maximum number of results to return.\n    query: Restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SearchRestaurantsResponse, await self._transport.request(
-            "searchRestaurants", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantsResponse, self._context, timeout,
+            "searchRestaurants", {"radius_meters": radius_meters, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantsResponse, self._context, timeout,
+        ))
+
+    async def get_menu_items(
+        self, *,
+        limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
+        restaurant_id: str,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> GetRestaurantMenuItemsResponse:
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(GetRestaurantMenuItemsResponse, await self._transport.request(
+            "getRestaurantMenuItems", {"limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout,
         ))
 
     async def search_menu_items(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        radius: float | UnsetType = UNSET,
-        limit: float | UnsetType = UNSET,
+        radius_meters: float | UnsetType = UNSET,
+        limit: int | UnsetType = UNSET,
         query: str,
         latitude: float,
         longitude: float,
         timeout: float | httpx.Timeout | None = None,
     ) -> SearchRestaurantMenuItemsResponse:
-        "Find matching menu items across nearby restaurants.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    radius: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. Default 8000 meters (about 5 miles); maximum 17000 (about 10.5 miles).\n    limit: Maximum number of results to return.\n    query: Dish or restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Find matching menu items across nearby restaurants.\n\nArgs:\n    radius_meters: Search radius in meters around (latitude, longitude), e.g. 5000 = 5 kilometers. A fractional value is accepted and rounded. Default 8000 meters (about 5 miles); maximum 50000 (about 31 miles).\n    limit: Maximum number of results to return.\n    query: Dish or restaurant name to search for.\n    latitude: Latitude of the search location, e.g. 37.7749 (San Francisco).\n    longitude: Longitude of the search location, e.g. -122.4194 (San Francisco).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: SearchRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(SearchRestaurantMenuItemsResponse, await self._transport.request(
-            "searchRestaurantMenuItems", {"end_user_id": end_user_id, "radius": radius, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout,
+            "searchRestaurantMenuItems", {"radius_meters": radius_meters, "limit": limit, "query": query, "latitude": latitude, "longitude": longitude}, SearchRestaurantMenuItemsResponse, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)
 class AsyncFoodAnalysis(AsyncResource):
     async def analyze_photo(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         image: ImageInput,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
-            "scanFoodPhoto", {"end_user_id": end_user_id, "image": image, "preprocess": preprocess}, FoodScan, self._context, timeout,
+            "scanFoodPhoto", {"image": image, "preprocess": preprocess}, FoodScan, self._context, timeout,
         ))
 
     async def analyze_description(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
         query: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Analyze a written food description and return detected foods and quantities.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    query: Natural-language description of what was eaten; parsed into detected foods with quantities.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a written food description and return detected foods and quantities.\n\nArgs:\n    query: Natural-language description of what was eaten; parsed into detected foods with quantities.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
-            "searchFoodsByNaturalLanguage", {"end_user_id": end_user_id, "query": query}, FoodScan, self._context, timeout,
+            "searchFoodsByNaturalLanguage", {"query": query}, FoodScan, self._context, timeout,
         ))
 
     async def correct(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        meal_name: str | UnsetType = UNSET,
-        detections: Sequence[FoodDetection | FoodDetectionInput],
-        user_input: str,
+        analysis: FoodScan | FoodScanInput,
+        instruction: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    meal_name: The meal name from the scan, when it returned one (photo scans do; text scans don't). Defaults to 'Meal'.\n    detections: Detections from a prior analysis. Returned typed models preserve additive response fields; arbitrary dictionaries remain validated.\n    user_input: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
-            "correctPhotoScan", {"end_user_id": end_user_id, "meal_name": meal_name, "detections": detections, "user_input": user_input}, FoodScan, self._context, timeout,
+            "correctPhotoScan", {"analysis": analysis, "instruction": instruction}, FoodScan, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)
@@ -430,73 +440,80 @@ class AsyncFoodLogs(AsyncResource):
     async def create(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput],
-        timestamp_utc: str | datetime | UnsetType = UNSET,
+        eaten_at: str | datetime | UnsetType = UNSET,
         name: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodLog:
-        "Log foods and selected serving quantities for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    foods: foods (required).\n    timestamp_utc: ISO timestamp or timezone-aware datetime; native values are serialized to UTC. Omit to retain server defaults.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        "Log foods and selected serving quantities for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    foods: foods (required).\n    eaten_at: When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
         return cast(FoodLog, await self._transport.request(
-            "createFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "foods": foods, "timestamp_utc": timestamp_utc, "name": name}, FoodLog, self._context, timeout,
+            "createFoodLog", {"end_user_id": end_user_id, "foods": foods, "eaten_at": eaten_at, "name": name}, FoodLog, self._context, timeout,
         ))
 
     async def list(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
-        start: str | date | datetime,
-        end: str | date | datetime,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    start: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers — required, so the upstream groups by the same days the caller means.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, await self._transport.request(
-            "listFoodLogs", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "start": start, "end": end}, ListFoodLogsResponse, self._context, timeout,
+            "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout,
+        ))
+
+    async def get(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        log_id: FoodLogId,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> FoodLog:
+        "Get one food log by ID.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodLog, await self._transport.request(
+            "getFoodLog", {"end_user_id": end_user_id, "log_id": log_id}, FoodLog, self._context, timeout,
         ))
 
     async def update(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         log_id: FoodLogId,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput] | UnsetType = UNSET,
-        timestamp_utc: str | datetime | UnsetType = UNSET,
+        eaten_at: str | datetime | UnsetType = UNSET,
         name: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodLog:
-        "Update the supplied fields of an existing food log.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    log_id: The log id returned when the log was created.\n    foods: foods (omit to use the server default).\n    timestamp_utc: ISO timestamp or timezone-aware datetime; native values are serialized to UTC. Omit to retain server defaults.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Update the supplied fields of an existing food log.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    foods: foods (omit to use the server default).\n    eaten_at: When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.\n    name: name (omit to use the server default).\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodLog, await self._transport.request(
-            "updateFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "log_id": log_id, "foods": foods, "timestamp_utc": timestamp_utc, "name": name}, FoodLog, self._context, timeout,
+            "updateFoodLog", {"end_user_id": end_user_id, "log_id": log_id, "foods": foods, "eaten_at": eaten_at, "name": name}, FoodLog, self._context, timeout,
         ))
 
     async def delete(
         self, *,
         end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         log_id: FoodLogId,
         timeout: float | httpx.Timeout | None = None,
-    ) -> DeleteFoodLogResponse:
-        "Delete a food log belonging to an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: DeleteFoodLogResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(DeleteFoodLogResponse, await self._transport.request(
-            "deleteFoodLog", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "log_id": log_id}, DeleteFoodLogResponse, self._context, timeout,
+    ) -> ResponseMetadata:
+        "Delete a food log belonging to an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ResponseMetadata, await self._transport.request(
+            "deleteFoodLog", {"end_user_id": end_user_id, "log_id": log_id}, ResponseMetadata, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)
 class AsyncGlucose(AsyncResource):
     async def predict(
         self, *,
-        end_user_id: PartnerUserId | UnsetType = UNSET,
-        end_user_timezone: str | UnsetType = UNSET,
         user_profile: GlucosePredictionProfile | GlucosePredictionProfileInput,
+        timezone: str,
         foods: Sequence[FoodLogInputFood | FoodLogInputFoodInput],
         start_time: str | datetime,
         cgm_data: Sequence[CgmReading | CgmReadingInput] | UnsetType = UNSET,
         consumed_foods: Sequence[ConsumedHistoricalFood | ConsumedHistoricalFoodInput] | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> GlucosePrediction:
-        "Predict a glucose response from a user profile and selected foods.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    end_user_timezone: IANA timezone name, for example America/New_York; may be bound with for_user().\n    user_profile: user profile (required).\n    foods: The meal to predict the glucose response for.\n    start_time: When the meal is (or will be) eaten. Must carry a timezone designator.\n    cgm_data: Optional CGM history for personalization; requires consumed_foods.\n    consumed_foods: The meals eaten during the CGM history; requires cgm_data.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: GlucosePrediction.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Predict a glucose response from a user profile and selected foods.\n\nArgs:\n    user_profile: user profile (required).\n    timezone: The IANA timezone the end user is in. The prediction depends on the meal's local time of day.\n    foods: The meal to predict the glucose response for.\n    start_time: When the meal is (or will be) eaten. Must carry a timezone designator.\n    cgm_data: Optional CGM history, to personalize the prediction to this end user. Send it together with `consumed_foods` covering the same period — **at least 5 complete days of paired history**, which is what the model needs to train on them. Fewer is refused with `invalid_request`. Omit both fields for a standard prediction, which needs no sensor and no history.\n    consumed_foods: The meals eaten during the CGM history; requires cgm_data.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: GlucosePrediction.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(GlucosePrediction, await self._transport.request(
-            "predictGlucose", {"end_user_id": end_user_id, "end_user_timezone": end_user_timezone, "user_profile": user_profile, "foods": foods, "start_time": start_time, "cgm_data": cgm_data, "consumed_foods": consumed_foods}, GlucosePrediction, self._context, timeout,
+            "predictGlucose", {"user_profile": user_profile, "timezone": timezone, "foods": foods, "start_time": start_time, "cgm_data": cgm_data, "consumed_foods": consumed_foods}, GlucosePrediction, self._context, timeout,
         ))
 
 @dataclass(frozen=True, repr=False)
@@ -523,34 +540,33 @@ class AsyncShared(AsyncResource):
 
 @dataclass(frozen=True, repr=False)
 class AsyncRoot(AsyncShared):
-    async def mint_client_token(
+    async def create_client_token(
         self, *,
         end_user_id: str,
-        scopes: Sequence[Literal["foods:read", "food_scans:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]] | UnsetType = UNSET,
-        ttl_seconds: float | UnsetType = UNSET,
+        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]],
+        ttl_seconds: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ClientTokenResponseDto:
-        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. Omit to grant the full client-grantable set (foods:read, food_scans:write, food_logs:read, food_logs:write, glucose:read, restaurants:read). Grant only what the screen needs.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ClientTokenResponseDto.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
-        return cast(ClientTokenResponseDto, await self._transport.request(
-            "mintClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientTokenResponseDto, self._context, timeout,
+    ) -> ClientToken:
+        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(ClientToken, await self._transport.request(
+            "createClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientToken, self._context, timeout,
         ))
 
     async def revoke_client_tokens(
         self, *,
         end_user_id: str,
         timeout: float | httpx.Timeout | None = None,
-    ) -> ResponseMetadata:
-        "Revoke client tokens for an end user with one request; return response metadata.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nThis operation is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(ResponseMetadata, await self._transport.request(
-            "revokeClientTokens", {"end_user_id": end_user_id}, ResponseMetadata, self._context, timeout,
+    ) -> ClientTokenRevocationResult:
+        "Revoke client tokens for an end user with one request.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ClientTokenRevocationResult.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nThis operation is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ClientTokenRevocationResult, await self._transport.request(
+            "revokeClientTokens", {"end_user_id": end_user_id}, ClientTokenRevocationResult, self._context, timeout,
         ))
 
-    async def credits(
+    async def get_credits(
         self, *,
-        end_user_id: str | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
-    ) -> CreditsResponseDto:
-        "Get the account's credit balance and reset information.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: CreditsResponseDto.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
-        return cast(CreditsResponseDto, await self._transport.request(
-            "credits", {"end_user_id": end_user_id}, CreditsResponseDto, self._context, timeout,
+    ) -> CreditBalance:
+        "Get the account's credit balance and reset information.\n\nArgs:\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: CreditBalance.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(CreditBalance, await self._transport.request(
+            "getCredits", {}, CreditBalance, self._context, timeout,
         ))

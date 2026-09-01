@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ClientScope = Literal[
     "foods:read",
-    "food_scans:write",
+    "food_analysis:write",
     "food_logs:read",
     "food_logs:write",
     "glucose:read",
@@ -19,7 +19,7 @@ ClientScope = Literal[
 @dataclass(frozen=True)
 class CreateClientTokenInput:
     end_user_id: str
-    scopes: Sequence[ClientScope] | None = None
+    scopes: Sequence[ClientScope]
     ttl_seconds: int | None = None
 
 

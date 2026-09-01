@@ -40,7 +40,7 @@ def exercise(
     mode: str,
     handler: Callable[[httpx.Request], httpx.Response],
     *,
-    operation: str = "credits",
+    operation: str = "get_credits",
     kwargs: dict[str, Any] | None = None,
     max_retries: int = 0,
     timeout: float = 120,
@@ -123,7 +123,7 @@ def test_closed_clients_stay_inside_error_hierarchy(mode: str) -> None:
         client = January(api_key=KEY)
         client.close()
         with pytest.raises(JanuaryError, match="closed"):
-            client.credits()
+            client.get_credits()
         with pytest.raises(JanuaryError, match="closed"):
             client.for_user("owner").foods.search(query="banana")
     else:
@@ -132,7 +132,7 @@ def test_closed_clients_stay_inside_error_hierarchy(mode: str) -> None:
             client = AsyncJanuary(api_key=KEY)
             await client.aclose()
             with pytest.raises(JanuaryError, match="closed"):
-                await client.credits()
+                await client.get_credits()
             with pytest.raises(JanuaryError, match="closed"):
                 await client.for_user("owner").foods.search(query="banana")
 
@@ -142,26 +142,26 @@ def test_closed_clients_stay_inside_error_hierarchy(mode: str) -> None:
 @pytest.mark.parametrize("mode", MODES)
 def test_wrapper_close_preserves_caller_owned_transport(mode: str) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json=BY_ID["credits"]["response"]["body"])
+        return httpx.Response(200, json=BY_ID["getCredits"]["response"]["body"])
 
     if mode == "sync":
         with httpx.Client(transport=httpx.MockTransport(handler)) as transport:
             client = January(api_key=KEY, http_client=transport)
             client.close()
-            client.credits()
+            client.get_credits()
             transport.close()
             with pytest.raises(JanuaryError, match="closed"):
-                client.credits()
+                client.get_credits()
     else:
 
         async def run() -> None:
             async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as transport:
                 client = AsyncJanuary(api_key=KEY, http_client=transport)
                 await client.aclose()
-                await client.credits()
+                await client.get_credits()
                 await transport.aclose()
                 with pytest.raises(JanuaryError, match="closed"):
-                    await client.credits()
+                    await client.get_credits()
 
         anyio.run(run, backend=mode)
 
@@ -226,7 +226,7 @@ def test_only_server_directed_waits_count_toward_retry_after_budget(mode: str, f
             return httpx.Response(500, json={"code": "internal_error"})
         if calls == 2:
             return httpx.Response(429, json={"code": "rate_limited"}, headers={"retry-after": "60"})
-        return httpx.Response(200, json=BY_ID["credits"]["response"]["body"])
+        return httpx.Response(200, json=BY_ID["getCredits"]["response"]["body"])
 
     result, waits = exercise(mode, handler, max_retries=2)
     assert not isinstance(result, JanuaryError)
@@ -326,15 +326,21 @@ def test_redirects_raise_january_error_without_following_or_exposing_location(mo
 )
 def test_date_ranges_take_the_local_calendar_day(mode: str, value: date) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params["start"] == "2026-08-31"
-        assert request.url.params["end"] == "2026-08-31"
+        assert request.url.params["start_date"] == "2026-08-31"
+        assert request.url.params["end_date"] == "2026-08-31"
+        assert request.url.params["timezone"] == "UTC"
         return httpx.Response(200, json=BY_ID["listFoodLogs"]["response"]["body"])
 
     result, _ = exercise(
         mode,
         handler,
         operation="food_logs.list",
-        kwargs={"end_user_id": "owner", "start": value, "end": value},
+        kwargs={
+            "end_user_id": "owner",
+            "start_date": value,
+            "end_date": value,
+            "timezone": "UTC",
+        },
     )
     assert not isinstance(result, JanuaryError)
 
@@ -352,11 +358,11 @@ def test_native_update_timestamp_is_serialized_and_naive_values_stay_invalid(mod
     kwargs = {
         "end_user_id": "owner",
         "log_id": "audit-log",
-        "timestamp_utc": datetime(2026, 8, 31, 1, tzinfo=timezone(timedelta(hours=3))),
+        "eaten_at": datetime(2026, 8, 31, 1, tzinfo=timezone(timedelta(hours=3))),
     }
     result, _ = exercise(mode, handler, operation="food_logs.update", kwargs=kwargs)
     assert not isinstance(result, JanuaryError)
-    kwargs["timestamp_utc"] = datetime(2026, 8, 31, 1)
+    kwargs["eaten_at"] = datetime(2026, 8, 31, 1)
     result, _ = exercise(mode, handler, operation="food_logs.update", kwargs=kwargs)
     assert isinstance(result, JanuaryValidationError) and calls == 1
 
@@ -365,5 +371,5 @@ def test_editor_signatures_accept_native_timestamps() -> None:
     from januaryai._generated import AsyncFoodLogs, SyncFoodLogs
 
     for resource in (SyncFoodLogs, AsyncFoodLogs):
-        assert datetime in get_type_hints(resource.update)["timestamp_utc"].__args__
-        assert datetime in get_type_hints(resource.list)["start"].__args__
+        assert datetime in get_type_hints(resource.update)["eaten_at"].__args__
+        assert datetime in get_type_hints(resource.list)["start_date"].__args__

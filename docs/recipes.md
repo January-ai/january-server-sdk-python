@@ -16,16 +16,21 @@ with January(max_retries=0) as client:
     user = client.for_user("your-authenticated-user", end_user_timezone="UTC")
     analysis = user.food_analysis.analyze_photo(image=Path("lunch.jpg"))
     corrected = user.food_analysis.correct(
-        detections=analysis.detections,
-        user_input="There was half as much rice",
+        analysis=analysis,
+        instruction="There was half as much rice",
     )
     selections = [
-        {"id": item.food.id, "serving": {
-            "id": item.food.servings[0].id,
-            "quantity": item.food.servings[0].quantity or 1,
-        }}
+        {
+            "food_id": item.food.id,
+            "serving_id": item.food.servings[0].id,
+            "quantity": item.food.servings[0].selected_quantity
+            or item.food.servings[0].quantity
+            or 1,
+        }
         for item in corrected.detections
-        if item.food.id is not None and item.food.servings
+        if item.food.id is not None
+        and item.food.servings
+        and item.food.servings[0].id is not None
     ]
     if selections:
         log = user.food_logs.create(foods=selections, name="Lunch")
@@ -80,5 +85,5 @@ with January() as client:
         print("Rate limited; retry-after seconds:", error.retry_after)
 ```
 
-For batch planning, inspect `client.credits()` before starting, but still handle
+For batch planning, inspect `client.get_credits()` before starting, but still handle
 credit exhaustion during the batch: another process can spend the same balance.
