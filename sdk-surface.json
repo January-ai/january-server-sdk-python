@@ -2,6 +2,24 @@
   "language": "python",
   "operations": [
     {
+      "operationId": "createClientToken",
+      "resource": null,
+      "method": "create_client_token",
+      "audience": "server"
+    },
+    {
+      "operationId": "revokeClientTokens",
+      "resource": null,
+      "method": "revoke_client_tokens",
+      "audience": "server"
+    },
+    {
+      "operationId": "getCredits",
+      "resource": null,
+      "method": "get_credits",
+      "audience": "server"
+    },
+    {
       "operationId": "searchFoods",
       "resource": "foods",
       "method": "search",
@@ -35,6 +53,12 @@
       "operationId": "searchRestaurants",
       "resource": "restaurants",
       "method": "search",
+      "audience": "shared"
+    },
+    {
+      "operationId": "getRestaurantMenuItems",
+      "resource": "restaurants",
+      "method": "get_menu_items",
       "audience": "shared"
     },
     {
@@ -74,6 +98,12 @@
       "audience": "shared"
     },
     {
+      "operationId": "getFoodLog",
+      "resource": "food_logs",
+      "method": "get",
+      "audience": "shared"
+    },
+    {
       "operationId": "updateFoodLog",
       "resource": "food_logs",
       "method": "update",
@@ -90,24 +120,6 @@
       "resource": "glucose",
       "method": "predict",
       "audience": "shared"
-    },
-    {
-      "operationId": "mintClientToken",
-      "resource": null,
-      "method": "mint_client_token",
-      "audience": "server"
-    },
-    {
-      "operationId": "revokeClientTokens",
-      "resource": null,
-      "method": "revoke_client_tokens",
-      "audience": "server"
-    },
-    {
-      "operationId": "credits",
-      "resource": null,
-      "method": "credits",
-      "audience": "server"
     }
   ]
 }
