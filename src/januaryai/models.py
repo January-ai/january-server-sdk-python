@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Literal
 from typing_extensions import Required, TypedDict
 from pydantic import Field
-from ._runtime import APIModel, parse_api_datetime
+from ._runtime import APIModel
 
 ActivityLevel = str
 ActivityLevelInput = Literal["sedentary", "lightly_active", "moderately_active", "very_active"]

@@ -23,28 +23,30 @@ from uuid import uuid4
 import httpx
 from image_cases import VALID_CASES, photo_case
 
-from januaryai import UNSET, AsyncJanuary, January, JanuaryAPIError, JanuaryTimeoutError
+from januaryai import AsyncJanuary, January, JanuaryAPIError, JanuaryTimeoutError
 from januaryai.models import FoodLogInputFoodInput
 
 ROOT = Path(__file__).resolve().parents[2]
 OPERATIONS = (
-    "credits",
+    "get_credits",
     "foods.search",
     "foods.autocomplete",
     "foods.get",
     "foods.lookup_barcode",
     "foods.suggest_alternatives",
     "restaurants.search",
+    "restaurants.get_menu_items",
     "restaurants.search_menu_items",
     "food_analysis.analyze_photo",
     "food_analysis.analyze_description",
     "food_analysis.correct",
     "food_logs.create",
     "food_logs.list",
+    "food_logs.get",
     "food_logs.update",
     "food_logs.delete",
     "glucose.predict",
-    "mint_client_token",
+    "create_client_token",
     "revoke_client_tokens",
 )
 
@@ -261,7 +263,7 @@ class Reporter:
         }
         cleanup_failures = sum(r["cleanup"] and r["status"] != "PASS" for r in self.results)
         passed = (
-            len(operations) == 18 * len(self.modes)
+            len(operations) == len(OPERATIONS) * len(self.modes)
             and counts["PASS"] == len(operations)
             and all(r["status"] == "PASS" for r in self.results)
         )
@@ -269,7 +271,7 @@ class Reporter:
             "language": "python",
             "modes": self.modes,
             "status": "PASS" if passed else "FAIL",
-            "expectedOperations": 18 * len(self.modes),
+            "expectedOperations": len(OPERATIONS) * len(self.modes),
             "counts": counts,
             "cleanupFailures": cleanup_failures,
             "expectedImageCases": len(self.image_cases) * len(self.modes),
@@ -425,7 +427,7 @@ async def workflow(
         return value
 
     try:
-        await step("credits", lambda: client.credits())
+        await step("get_credits", lambda: client.get_credits())
         found = await step(
             "foods.search",
             lambda: user.foods.search(query=config.query),
@@ -440,8 +442,8 @@ async def workflow(
         )
         await step(
             "foods.lookup_barcode",
-            lambda: user.foods.lookup_barcode(upc=config.upc),
-            validate=lambda r: require(bool(r.items), "barcode_not_found"),
+            lambda: user.foods.lookup_barcode(barcode=config.upc),
+            validate=lambda r: require(bool(r.id), "barcode_not_found"),
         )
         await step(
             "foods.suggest_alternatives",
@@ -453,7 +455,15 @@ async def workflow(
             "latitude": config.latitude,
             "longitude": config.longitude,
         }
-        await step("restaurants.search", lambda: user.restaurants.search(**location))
+        restaurants = await step("restaurants.search", lambda: user.restaurants.search(**location))
+        restaurant_id = restaurants.items[0].id if restaurants and restaurants.items else None
+        await step(
+            "restaurants.get_menu_items",
+            lambda: user.restaurants.get_menu_items(restaurant_id=require_value(restaurant_id)),
+            blocked="restaurants.search did not return a restaurant"
+            if restaurant_id is None
+            else None,
+        )
         await step(
             "restaurants.search_menu_items", lambda: user.restaurants.search_menu_items(**location)
         )
@@ -471,9 +481,8 @@ async def workflow(
         await step(
             "food_analysis.correct",
             lambda: user.food_analysis.correct(
-                meal_name=analysis.meal_name if analysis.meal_name is not None else UNSET,
-                detections=analysis.detections,
-                user_input="The portion is one serving.",
+                analysis=require_value(analysis),
+                instruction="The portion is one serving.",
             ),
             blocked="food analysis did not return detections" if analysis is None else None,
             validate=lambda r: require(bool(r.detections), "no_corrected_detections"),
@@ -500,8 +509,8 @@ async def workflow(
         servings = food.servings if food is not None else []
         serving = next((s for s in servings if s.is_primary), servings[0] if servings else None)
         selection: list[FoodLogInputFoodInput] | None = (
-            [{"id": food.id, "serving": {"id": serving.id, "quantity": 1}}]
-            if serving is not None and food is not None
+            [{"food_id": food.id, "serving_id": serving.id, "quantity": 1}]
+            if serving is not None and serving.id is not None and food is not None
             else None
         )
 
@@ -511,7 +520,7 @@ async def workflow(
             log = await invoke(
                 user.food_logs.create,
                 foods=require_value(selection),
-                timestamp_utc=started,
+                eaten_at=started,
                 name=marker,
             )
             if isinstance(log.id, str) and log.id:
@@ -538,8 +547,17 @@ async def workflow(
 
         await step(
             "food_logs.list",
-            lambda: user.food_logs.list(start=date_range["start"], end=date_range["end"]),
+            lambda: user.food_logs.list(
+                start_date=date_range["start"],
+                end_date=date_range["end"],
+                timezone="UTC",
+            ),
             validate=check_logs,
+        )
+        await step(
+            "food_logs.get",
+            lambda: user.food_logs.get(log_id=require_value(created).id),
+            blocked="food_logs.create did not return a log" if created is None else None,
         )
         await step(
             "food_logs.update",
@@ -563,16 +581,17 @@ async def workflow(
                 },
                 foods=require_value(selection),
                 start_time=started,
+                timezone="UTC",
             ),
             blocked="foods.get did not return a usable serving" if selection is None else None,
-            validate=lambda r: require(bool(r.prediction), "empty_glucose_prediction"),
+            validate=lambda r: require(bool(r.points), "empty_glucose_prediction"),
         )
 
         async def mint_token() -> Any:
             nonlocal mint_attempted
             mint_attempted = True  # Set before HTTP, including ambiguous timeout failures.
             token = await invoke(
-                client.mint_client_token,
+                client.create_client_token,
                 end_user_id=user_id,
                 scopes=["foods:read"],
                 ttl_seconds=300,
@@ -586,18 +605,19 @@ async def workflow(
                 "token_expiry_invalid",
             )
             try:
-                expires_at = datetime.fromisoformat(token.expires_at.replace("Z", "+00:00"))
-                require(expires_at.utcoffset() is not None, "token_expiry_invalid")
-            except ValueError:
+                require(token.expires_at.utcoffset() is not None, "token_expiry_invalid")
+            except AttributeError:
                 raise CheckFailed("token_expiry_invalid") from None
             return token
 
-        token = await step("mint_client_token", mint_token)
+        token = await step("create_client_token", mint_token)
         await step(
             "client_token.foods.search",
             lambda: token_probe(config, token.token, mode),
             kind="check",
-            blocked="mint_client_token did not return a verified token" if token is None else None,
+            blocked="create_client_token did not return a verified token"
+            if token is None
+            else None,
         )
     finally:
         try:
@@ -610,7 +630,11 @@ async def workflow(
 
                 await step(
                     "cleanup.food_logs.list",
-                    lambda: user.food_logs.list(start=date_range["start"], end=date_range["end"]),
+                    lambda: user.food_logs.list(
+                        start_date=date_range["start"],
+                        end_date=date_range["end"],
+                        timezone="UTC",
+                    ),
                     validate=recover,
                     kind="cleanup",
                     cleanup=True,
@@ -633,7 +657,7 @@ async def workflow(
                     lambda log_id=log_id: user.food_logs.delete(log_id=log_id),
                     kind="operation" if index == 0 else "cleanup",
                     cleanup=True,
-                    validate=lambda r: require(r.status == "deleted", "log_delete_not_confirmed"),
+                    validate=lambda r: require(r.status_code == 204, "log_delete_not_confirmed"),
                 )
                 if deleted is not None:
                     owned_logs.discard(log_id)
@@ -643,9 +667,9 @@ async def workflow(
                     "revoke_client_tokens",
                     lambda: client.revoke_client_tokens(end_user_id=user_id),
                     cleanup=True,
-                    blocked="mint_client_token was not attempted" if not mint_attempted else None,
+                    blocked="create_client_token was not attempted" if not mint_attempted else None,
                     validate=lambda r: require(
-                        r.status_code == 204 and r.revoked_count is not None,
+                        r.revoked_count is not None,
                         "revocation_not_confirmed",
                     ),
                 )

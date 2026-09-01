@@ -22,7 +22,7 @@ def test_demo_issuer_returns_stable_token_shape() -> None:
         )
     )
 
-    token = january.client_tokens.create(end_user_id="user-123")
+    token = january.client_tokens.create(end_user_id="user-123", scopes=["foods:read"])
 
     assert token.to_dict() == {
         "token": "demo-token",
@@ -35,7 +35,7 @@ def test_async_client_supports_fastapi_style_routes() -> None:
         january = AsyncJanuary(
             client_token_issuer=create_async_demo_token_issuer(access_token="demo-token")
         )
-        token = await january.client_tokens.create(end_user_id="user-123")
+        token = await january.client_tokens.create(end_user_id="user-123", scopes=["foods:read"])
         assert token.access_token == "demo-token"
 
     asyncio.run(run())
@@ -44,7 +44,7 @@ def test_async_client_supports_fastapi_style_routes() -> None:
 def test_rejects_missing_authenticated_user() -> None:
     january = January(client_token_issuer=create_demo_token_issuer(access_token="demo-token"))
     with pytest.raises(JanuaryValidationError):
-        january.client_tokens.create(end_user_id=" ")
+        january.client_tokens.create(end_user_id=" ", scopes=["foods:read"])
 
 
 def test_rejects_sk_secret_in_demo_mode() -> None:

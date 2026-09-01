@@ -57,11 +57,13 @@ class ConsumerTest(unittest.TestCase):
                 async with AsyncJanuary(
                     max_retries=0, secret_key="sk-local-fixture", base_url=origin
                 ) as async_client:
-                    token = await async_client.client_tokens.create(end_user_id="user")
+                    token = await async_client.client_tokens.create(
+                        end_user_id="user", scopes=["foods:read"]
+                    )
                     self.assertEqual(token.token, "ct-fixture")
 
             asyncio.run(run())
-            self.assertEqual(requests[1], {"end_user_id": "user"})
+            self.assertEqual(requests[1], {"end_user_id": "user", "scopes": ["foods:read"]})
             for kwargs in [
                 {"scopes": []},
                 {"scopes": ["unknown"]},
@@ -72,7 +74,9 @@ class ConsumerTest(unittest.TestCase):
                 {"end_user_id": "😀" * 33},
             ]:
                 with self.assertRaises(JanuaryValidationError):
-                    client.client_tokens.create(**{"end_user_id": "user", **kwargs})
+                    client.client_tokens.create(
+                        **{"end_user_id": "user", "scopes": ["foods:read"], **kwargs}
+                    )
             self.assertEqual(len(requests), 2)
             for invalid in [
                 {**valid, "expires_in": "300"},
@@ -83,14 +87,14 @@ class ConsumerTest(unittest.TestCase):
             ]:
                 payload = invalid
                 with self.assertRaises(JanuaryResponseError) as response_error:
-                    client.client_tokens.create(end_user_id="user")
+                    client.client_tokens.create(end_user_id="user", scopes=["foods:read"])
                 self.assertEqual(response_error.exception.status_code, 201)
                 self.assertNotIsInstance(response_error.exception, JanuaryAPIError)
             status = 429
             payload = {"message": "Try later", "code": "rate_limited"}
             count = len(requests)
             with self.assertRaises(JanuaryAPIError) as error:
-                client.client_tokens.create(end_user_id="user")
+                client.client_tokens.create(end_user_id="user", scopes=["foods:read"])
             self.assertEqual(error.exception.code, "rate_limited")
             self.assertEqual(len(requests), count + 1)
             client.close()

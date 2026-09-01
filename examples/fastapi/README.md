@@ -47,7 +47,7 @@ actual response contains a credential, so do not log or share it):
 {"token":"ct-example-placeholder","expiresIn":1800}
 ```
 
-The relay calls the canonical async root `mint_client_token()` operation with
+The relay calls the canonical async root `create_client_token()` operation with
 the authenticated user's ID, server-selected `scopes=["foods:read"]`, and
 `ttl_seconds=1800`. Request bodies cannot override the user, scopes, or lifetime.
 For client SDK compatibility, the relay maps the canonical result's `token` to

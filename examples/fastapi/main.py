@@ -41,7 +41,7 @@ async def create_january_token(
 ) -> dict[str, object]:
     # The caller cannot choose end_user_id or scopes; both are server-controlled.
     try:
-        token = await request.app.state.january.mint_client_token(
+        token = await request.app.state.january.create_client_token(
             end_user_id=user_id,
             scopes=["foods:read"],
             ttl_seconds=1800,

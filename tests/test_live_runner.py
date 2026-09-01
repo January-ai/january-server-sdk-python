@@ -83,7 +83,7 @@ def service(fail=None, revoke_count=1, hide_logs=False):
             response = deepcopy(fixture["response"])
             payload = self.rfile.read(int(self.headers.get("content-length", "0")))
             body = json.loads(payload) if payload else None
-            user = self.headers.get("x-end-user-id")
+            user = self.headers.get("January-End-User-ID")
             auth = self.headers.get("authorization")
             state["requests"].append(
                 {
@@ -97,25 +97,27 @@ def service(fail=None, revoke_count=1, hide_logs=False):
             )
             if user:
                 state["users"].add(user)
-            if op in {"searchFoods", "lookupFoodByBarcode"}:
-                response["body"]["items"][0]["id"] = 90000011
+            if op == "searchFoods":
+                response["body"]["items"][0]["id"] = "90000011"
+            if op == "lookupFoodByBarcode":
+                response["body"]["id"] = "90000011"
             if op == "getFood":
-                response["body"]["id"] = 90000011
-                response["body"]["servings"][0]["id"] = 80000022
+                response["body"]["id"] = "90000011"
+                response["body"]["servings"][0]["id"] = "80000022"
                 for serving in response["body"]["servings"]:
-                    serving["is_primary"] = serving["id"] == 80000022
+                    serving["is_primary"] = serving["id"] == "80000022"
             if op == "createFoodLog":
                 assert body is not None
                 log = response["body"]
-                log.update(id=str(uuid4()), name=body["name"], timestamp_utc=body["timestamp_utc"])
+                log.update(id=str(uuid4()), name=body.get("name"), eaten_at=body["eaten_at"])
                 state["logs"].setdefault(user, {})[log["id"]] = deepcopy(log)
             if op == "listFoodLogs":
-                response["body"] = {
-                    "total_count": len(state["logs"].get(user, {})),
-                    "items": list(state["logs"].get(user, {}).values()),
-                }
+                response["body"] = {"items": list(state["logs"].get(user, {}).values())}
                 if hide_logs:
-                    response["body"] = {"total_count": 0, "items": []}
+                    response["body"] = {"items": []}
+            if op == "getFoodLog":
+                log_id = unquote(location.path.rsplit("/", 1)[1])
+                response["body"] = deepcopy(state["logs"][user][log_id])
             if op == "updateFoodLog":
                 assert body is not None
                 log_id = unquote(location.path.rsplit("/", 1)[1])
@@ -123,7 +125,7 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"] = deepcopy(state["logs"][user][log_id])
             if op == "deleteFoodLog" and op not in state["fail"]:
                 state["logs"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
-            if op == "mintClientToken":
+            if op == "createClientToken":
                 assert body is not None
                 token = "ct-offline-" + str(uuid4())
                 state["tokens"][body["end_user_id"]] = token
@@ -135,11 +137,12 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                     expires_at=(datetime.now(UTC) + timedelta(seconds=300)).isoformat(),
                 )
             if op == "revokeClientTokens":
-                token_user = parse_qs(location.query)["end_user_id"][0]
+                assert body is not None
+                token_user = body["end_user_id"]
                 state["revocations"].append(token_user)
                 if op not in state["fail"]:
                     state["tokens"].pop(token_user, None)
-                response["headers"]["X-Revoked-Count"] = str(revoke_count)
+                response["body"]["revoked_count"] = revoke_count
             if auth and auth.startswith("Bearer ct-"):
                 assert auth[7:] in state["tokens"].values()
             if op in state["fail"]:
@@ -231,7 +234,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 36}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 40}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -241,16 +244,16 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_18_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_20_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 36, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 38  # 18 + one client-token probe per mode.
+        assert len(state["requests"]) == 42  # 20 + one client-token probe per mode.
         assert len(state["revocations"]) == 2
         assert len(set(state["revocations"])) == 2
         assert all(
@@ -263,7 +266,11 @@ def test_default_both_modes_all_18_local_http_and_live_ids(tmp_path, legacy_url)
         for request in state["requests"]:
             if request["operation"] in {"createFoodLog", "predictGlucose"}:
                 assert request["body"]["foods"] == [
-                    {"id": 90000011, "serving": {"id": 80000022, "quantity": 1}}
+                    {
+                        "food_id": "90000011",
+                        "serving_id": "80000022",
+                        "quantity": 1,
+                    }
                 ]
             if request["operation"] == "scanFoodPhoto":
                 assert base64.b64decode(request["body"]["image"].split(",", 1)[1]) == PNG
@@ -282,9 +289,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 36, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 72
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 76
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 
@@ -308,7 +315,7 @@ def test_independent_operations_continue_and_dependencies_blocked(tmp_path):
         assert rows["food_analysis.correct"]["status"] == "BLOCKED"
         assert rows["glucose.predict"]["status"] == "BLOCKED"
         assert rows["restaurants.search_menu_items"]["status"] == "PASS"
-        assert rows["mint_client_token"]["status"] == "PASS"
+        assert rows["create_client_token"]["status"] == "PASS"
         assert rows["revoke_client_tokens"]["status"] == "PASS"
         assert rows["foods.get"]["reason"]
         assert "private meal" not in output and "ct-do-not-print" not in output
@@ -317,13 +324,13 @@ def test_independent_operations_continue_and_dependencies_blocked(tmp_path):
 
 @pytest.mark.parametrize("mode", ["sync", "async"])
 def test_cleanup_after_ambiguous_mint_and_update_failure(tmp_path, mode):
-    with service(fail={"mintClientToken": True, "updateFoodLog": True}) as state:
+    with service(fail={"createClientToken": True, "updateFoodLog": True}) as state:
         code, report, _output = run(tmp_path, state, mode)
         assert code == 1
         assert not state["tokens"]
         assert not any(state["logs"].values())
         assert len(state["revocations"]) == 1
-        assert sum(r["operation"] == "mintClientToken" for r in state["requests"]) == 1
+        assert sum(r["operation"] == "createClientToken" for r in state["requests"]) == 1
         rows = {r["operation"]: r for r in report["results"]}
         assert rows["client_token.foods.search"]["status"] == "BLOCKED"
         assert rows["food_logs.delete"]["status"] == "PASS"
@@ -371,7 +378,7 @@ def test_report_sanitizes_error_metadata(tmp_path):
     rows = []
     report = live.Reporter(["sync"], rows.append)
     report.secrets.add("sk-secret")
-    report.record("sync", "credits", "FAIL", code="sk-secret", request_id="ct-secret")
+    report.record("sync", "get_credits", "FAIL", code="sk-secret", request_id="ct-secret")
     assert "sk-secret" not in rows[0] and "ct-secret" not in rows[0]
 
 

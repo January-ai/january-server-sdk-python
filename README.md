@@ -31,7 +31,7 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Getting an API key](#getting-an-api-key)
 - [Installation and dependencies](#installation-and-dependencies)
 - [Quickstart](#quickstart)
-- [All 18 operations at a glance](#all-18-operations-at-a-glance)
+- [All 20 operations at a glance](#all-20-operations-at-a-glance)
 - [End users and user views](#end-users-and-user-views)
 - [Food analysis and photos](#food-analysis-and-photos)
 - [Portions and serving sizes](#portions-and-serving-sizes)
@@ -58,7 +58,7 @@ short-lived `ct-` client tokens are for mobile and web SDKs and are rejected her
 You do not need to enable client tokens to search foods or analyze a photo.
 
 API calls may consume credits. Check your plan and allowance in
-[Billing](https://dashboard.january.ai/billing), or call `client.credits()`.
+[Billing](https://dashboard.january.ai/billing), or call `client.get_credits()`.
 
 ## Installation and dependencies
 
@@ -138,7 +138,7 @@ a valid result. Replace the example user ID with your authenticated user's ID.
 the `.env`; the SDK never searches for one. Existing environment values take
 precedence. The example disables retries to keep it to one request.
 
-## All 18 operations at a glance
+## All 20 operations at a glance
 
 The table uses an open `client` and a `user = client.for_user(...)` view.
 Calls show the main arguments; replace `...` with your application's values.
@@ -148,27 +148,29 @@ All arguments are keyword-only. Async clients expose the same methods with `awai
 | --- | --- | --- |
 | `user.food_analysis.analyze_photo(image=...)` | Identify foods in a photo | `FoodScan` |
 | `user.food_analysis.analyze_description(query=...)` | Understand a written food description | `FoodScan` |
-| `user.food_analysis.correct(detections=..., user_input=...)` | Revise an analysis in plain language | `FoodScan` |
+| `user.food_analysis.correct(analysis=..., instruction=...)` | Revise an analysis in plain language | `FoodScan` |
 | `user.foods.search(query=...)` | Search the food database | `FoodSearchResults` |
 | `user.foods.autocomplete(query=...)` | Suggest food names while typing | `AutocompleteFoodsResponse` |
 | `user.foods.get(food_id=...)` | Retrieve a food and its serving options | `FoodSearchItem` |
-| `user.foods.lookup_barcode(upc=...)` | Find a food by barcode | `FoodSearchResults` |
+| `user.foods.lookup_barcode(barcode=...)` | Find a food by barcode | `FoodSearchItem` |
 | `user.foods.suggest_alternatives(food_id=...)` | Find food alternatives with dietary filters | `SuggestFoodAlternativesResponse` |
 | `user.restaurants.search(query=..., latitude=..., longitude=...)` | Find nearby restaurants | `SearchRestaurantsResponse` |
+| `user.restaurants.get_menu_items(restaurant_id=...)` | Load a restaurant's menu | `GetRestaurantMenuItemsResponse` |
 | `user.restaurants.search_menu_items(query=..., latitude=..., longitude=...)` | Find dishes across nearby restaurant menus | `SearchRestaurantMenuItemsResponse` |
 | `user.food_logs.create(foods=...)` | Record a meal for a user | `FoodLog` |
-| `user.food_logs.list(start=..., end=...)` | List food logs within a date range | `ListFoodLogsResponse` |
+| `user.food_logs.list(start_date=..., end_date=..., timezone=...)` | List food logs within a date range | `ListFoodLogsResponse` |
+| `user.food_logs.get(log_id=...)` | Retrieve one food log | `FoodLog` |
 | `user.food_logs.update(log_id=..., name=...)` | Update a food log's supplied fields | `FoodLog` |
-| `user.food_logs.delete(log_id=...)` | Delete a food log | `DeleteFoodLogResponse` |
-| `user.glucose.predict(user_profile=..., foods=..., start_time=...)` | Predict a meal's glucose response | `GlucosePrediction` |
-| `client.credits()` | Read the account's credit balance | `CreditsResponseDto` |
-| `client.mint_client_token(end_user_id=...)` | Mint a short-lived token for an end user | `ClientTokenResponseDto` |
-| `client.revoke_client_tokens(end_user_id=...)` | Revoke an end user's client tokens | `ResponseMetadata` |
+| `user.food_logs.delete(log_id=...)` | Delete a food log | `ResponseMetadata` |
+| `user.glucose.predict(user_profile=..., timezone=..., foods=..., start_time=...)` | Predict a meal's glucose response | `GlucosePrediction` |
+| `client.get_credits()` | Read the account's credit balance | `CreditBalance` |
+| `client.create_client_token(end_user_id=..., scopes=...)` | Create a short-lived token for an end user | `ClientToken` |
+| `client.revoke_client_tokens(end_user_id=...)` | Revoke an end user's client tokens | `ClientTokenRevocationResult` |
 
-The first 15 operations also exist directly on `client`, with explicit
-`end_user_id=` and, where applicable, `end_user_timezone=`. The last three are
-server-only and are not exposed by a user view. Your editor shows optional
-arguments and typed response fields through autocomplete.
+The 17 resource operations also exist directly on `client`. A user view binds
+identity for food-log operations; account-scoped reads do not send user headers.
+The last three operations are server-only and are not exposed by a user view.
+Your editor shows optional arguments and typed response fields through autocomplete.
 
 ## End users and user views
 
@@ -188,15 +190,15 @@ the user's local time. Only operations declaring that header receive it.
 
 A photo and a written description both return `FoodScan`: recognized foods,
 serving options and nutrition. `food_analysis.correct` accepts the returned
-detections and a description of what should change.
+analysis and a description of what should change.
 
 Within an open client context, for an existing `user` view:
 
 ```python
 analysis = user.food_analysis.analyze_photo(image="lunch.jpg")
 revised = user.food_analysis.correct(
-    detections=analysis.detections,
-    user_input="The rice portion was half as much",
+    analysis=analysis,
+    instruction="The rice portion was half as much",
 )
 ```
 
@@ -246,18 +248,19 @@ and [runnable portion example](examples/portions/main.py).
 
 ## Server-only APIs
 
-`client.credits()`, `client.mint_client_token(...)` and
+`client.get_credits()`, `client.create_client_token(...)` and
 `client.revoke_client_tokens(...)` operate on the root client, never a user view.
 
 For client-token minting, first open
 [Client tokens](https://dashboard.january.ai/dashboard/client-tokens) and choose
 **Enable client tokens** for your partner account. Mint on your backend with the
-authenticated user's ID; optionally supply `scopes=["foods:read"]` and
-`ttl_seconds=1800`. Return the token only to that authenticated user, never to logs.
+authenticated user's ID; supply the least-privilege scopes it needs, such as
+`scopes=["foods:read"]`, and optionally `ttl_seconds=1800`. Return the token only
+to that authenticated user, never to logs.
 
 Revoke separately when intentionally invalidating that user's tokens—not
-immediately after minting. Revocation makes one DELETE request and exposes
-`revoked_count` on the returned metadata. It is never automatically retried.
+immediately after creation. Revocation makes one POST request and returns a
+`ClientTokenRevocationResult` with `revoked_count`. It is never automatically retried.
 
 For mobile/web integration, see the [authenticated token-relay example](examples/fastapi/README.md).
 

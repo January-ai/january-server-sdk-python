@@ -69,9 +69,9 @@ def assert_one_search(service):
     assert parse_qs(urlsplit(request["path"]).query) == {"query": ["banana"]}
     assert request["body"] is None
     assert request["headers"]["authorization"] == f"Bearer {FAKE_KEY}"
-    assert request["headers"]["x-end-user-id"] == "january-quickstart"
-    # The view binds UTC, but search has no timezone parameter in the contract.
-    assert "x-end-user-timezone" not in request["headers"]
+    # Food search is account-scoped, so the bound user and timezone are not sent.
+    assert "january-end-user-id" not in request["headers"]
+    assert "january-end-user-timezone" not in request["headers"]
 
 
 @pytest.mark.parametrize("script", (*SCRIPTS, "minimal.py"))

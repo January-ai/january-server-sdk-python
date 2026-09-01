@@ -1,4 +1,4 @@
-"""Compatibility token issuers using the generated mint_client_token operation."""
+"""Compatibility token issuers using the generated create_client_token operation."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class HttpClientTokenIssuer:
     def create(self, request: CreateClientTokenInput) -> ClientToken:
         return self._client.client_tokens.create(
             end_user_id=request.end_user_id,
-            scopes=list(request.scopes) if request.scopes is not None else None,
+            scopes=list(request.scopes),
             ttl_seconds=request.ttl_seconds,
         )
 
@@ -40,7 +40,7 @@ class AsyncHttpClientTokenIssuer:
     async def create(self, request: CreateClientTokenInput) -> ClientToken:
         return await self._client.client_tokens.create(
             end_user_id=request.end_user_id,
-            scopes=list(request.scopes) if request.scopes is not None else None,
+            scopes=list(request.scopes),
             ttl_seconds=request.ttl_seconds,
         )
 

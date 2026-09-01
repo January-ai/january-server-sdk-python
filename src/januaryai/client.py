@@ -33,7 +33,7 @@ def _credential(secret_key: str | None, api_key: str | None, demo: bool) -> str 
 
 
 class ClientTokens:
-    """Client-token helpers. Prefer January.mint_client_token for new integrations."""
+    """Compatibility helper. Prefer January.create_client_token for new integrations."""
 
     def __init__(self, client: January, issuer: ClientTokenIssuer | None) -> None:
         self._client = client
@@ -43,20 +43,22 @@ class ClientTokens:
         self,
         *,
         end_user_id: str,
-        scopes: list[ClientScope] | None = None,
+        scopes: list[ClientScope],
         ttl_seconds: int | None = None,
     ) -> ClientToken:
         request = CreateClientTokenInput(end_user_id, scopes, ttl_seconds)
         validate_create_input(request)
         if self._issuer is not None:
             return self._issuer.create(request)
-        result = self._client.mint_client_token(
+        result = self._client.create_client_token(
             end_user_id=end_user_id,
-            scopes=scopes if scopes is not None else UNSET,
+            scopes=scopes,
             ttl_seconds=ttl_seconds if ttl_seconds is not None else UNSET,
         )
         return ClientToken(
-            token=result.token, expires_in=int(result.expires_in), expires_at=result.expires_at
+            token=result.token,
+            expires_in=int(result.expires_in),
+            expires_at=result.expires_at.isoformat(),
         )
 
 
@@ -71,20 +73,22 @@ class AsyncClientTokens:
         self,
         *,
         end_user_id: str,
-        scopes: list[ClientScope] | None = None,
+        scopes: list[ClientScope],
         ttl_seconds: int | None = None,
     ) -> ClientToken:
         request = CreateClientTokenInput(end_user_id, scopes, ttl_seconds)
         validate_create_input(request)
         if self._issuer is not None:
             return await self._issuer.create(request)
-        result = await self._client.mint_client_token(
+        result = await self._client.create_client_token(
             end_user_id=end_user_id,
-            scopes=scopes if scopes is not None else UNSET,
+            scopes=scopes,
             ttl_seconds=ttl_seconds if ttl_seconds is not None else UNSET,
         )
         return ClientToken(
-            token=result.token, expires_in=int(result.expires_in), expires_at=result.expires_at
+            token=result.token,
+            expires_in=int(result.expires_in),
+            expires_at=result.expires_at.isoformat(),
         )
 
 

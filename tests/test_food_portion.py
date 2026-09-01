@@ -36,8 +36,12 @@ NUTRIENTS = (
 
 def example_food():
     return FoodSearchItem(
-        id=42,
+        id="42",
+        type="generic",
         name="Test food",
+        brand_name=None,
+        image_url=None,
+        barcode=None,
         glycemic_index=50,
         glycemic_load=8,
         nutrients=NutritionFacts(
@@ -46,10 +50,10 @@ def example_food():
         ),
         servings=[
             ServingOption(
-                id=1, quantity=1, unit="slice", scaling_factor=1, weight_grams=50, is_primary=True
+                id="1", quantity=1, unit="slice", scaling_factor=1, weight_grams=50, is_primary=True
             ),
             ServingOption(
-                id=2,
+                id="2",
                 quantity=2,
                 unit="pieces",
                 scaling_factor=3,
@@ -62,21 +66,22 @@ def example_food():
 
 def test_primary_default_and_request_ready_selection():
     portion = FoodPortion.from_food(example_food())
-    assert portion.food_id == 42
-    assert portion.serving.id == 1
+    assert portion.food_id == "42"
+    assert portion.serving.id == "1"
     assert portion.quantity == 1
     assert portion.nutrition.calories is not None
     assert portion.nutrition.calories.value == 100
     assert portion.total_weight_grams == 50
     assert isinstance(portion.selection, FoodLogInputFood)
     assert portion.selection.model_dump(by_alias=True, exclude_unset=True) == {
-        "id": 42,
-        "serving": {"id": 1, "quantity": 1},
+        "food_id": "42",
+        "serving_id": "1",
+        "quantity": 1,
     }
 
 
 def test_alternate_serving_matches_node_client_scaling():
-    portion = FoodPortion.from_food(example_food(), serving_id=2, quantity=4)
+    portion = FoodPortion.from_food(example_food(), serving_id="2", quantity=4)
     assert portion.nutrition.calories is not None
     assert portion.nutrition.calories.value == 600
     assert portion.nutrition.protein is not None
@@ -84,14 +89,18 @@ def test_alternate_serving_matches_node_client_scaling():
     assert portion.total_weight_grams == 240
     assert portion.glycemic_index == 50
     assert portion.glycemic_load == 48
-    assert portion.selection.serving.id == 2
-    assert portion.selection.serving.quantity == 4
+    assert portion.selection.serving_id == "2"
+    assert portion.selection.quantity == 4
 
 
 def test_gram_serving_matches_ios_client_scaling():
     food = FoodSearchItem(
-        id=70381819,
+        id="70381819",
+        type="generic",
         name="banana",
+        brand_name=None,
+        image_url=None,
+        barcode=None,
         glycemic_index=51,
         glycemic_load=12,
         nutrients=NutritionFacts.model_validate(
@@ -104,7 +113,7 @@ def test_gram_serving_matches_ios_client_scaling():
         ),
         servings=[
             ServingOption(
-                id=2,
+                id="2",
                 quantity=100,
                 unit="g",
                 scaling_factor=0.8474576271,
@@ -113,7 +122,7 @@ def test_gram_serving_matches_ios_client_scaling():
             )
         ],
     )
-    portion = FoodPortion.from_food(food, serving_id=2, quantity=200)
+    portion = FoodPortion.from_food(food, serving_id="2", quantity=200)
     assert portion.nutrition.calories is not None
     assert portion.nutrition.calories.value == pytest.approx(178, abs=0.001)
     assert portion.nutrition.protein is not None
@@ -136,7 +145,7 @@ def test_scales_all_16_generated_nutrients_and_preserves_units():
         for index, name in enumerate(NUTRIENTS)
     }
     food = example_food().model_copy(update={"nutrients": NutritionFacts.model_validate(raw)})
-    nutrition = FoodPortion.from_food(food, serving_id=2, quantity=4).nutrition
+    nutrition = FoodPortion.from_food(food, serving_id="2", quantity=4).nutrition
     assert nutrition.model_fields_set == set(NUTRIENTS)
     assert nutrition.model_dump(by_alias=True, exclude_unset=True) == {
         name: {"value": amount["value"] * 6, "unit": amount["unit"]} for name, amount in raw.items()
@@ -159,12 +168,18 @@ def test_sparse_zero_and_empty_nutrients_keep_presence():
 
 def test_existing_explicit_none_and_missing_weight_glycemic_values_are_preserved():
     food = FoodSearchItem(
-        id=42,
+        id="42",
+        type="generic",
         name="Test",
+        brand_name=None,
+        glycemic_index=None,
+        glycemic_load=None,
+        image_url=None,
+        barcode=None,
         nutrients=NutritionFacts(protein=None),
         servings=[
             ServingOption(
-                id=1,
+                id="1",
                 quantity=2,
                 unit="pieces",
                 scaling_factor=1,
@@ -187,7 +202,7 @@ def test_existing_explicit_none_and_missing_weight_glycemic_values_are_preserved
 
 def test_defaults_to_selected_serving_quantity_and_first_primary_or_first():
     food = example_food()
-    alternate = FoodPortion.from_food(food, serving_id=2)
+    alternate = FoodPortion.from_food(food, serving_id="2")
     assert alternate.quantity == 2
     assert alternate.nutrition.calories is not None
     assert alternate.nutrition.calories.value == 300
@@ -195,14 +210,16 @@ def test_defaults_to_selected_serving_quantity_and_first_primary_or_first():
     both_primary = [
         serving.model_copy(update={"is_primary": True}) for serving in reversed(food.servings)
     ]
-    assert FoodPortion.from_food(food.model_copy(update={"servings": both_primary})).serving.id == 2
+    assert (
+        FoodPortion.from_food(food.model_copy(update={"servings": both_primary})).serving.id == "2"
+    )
     no_primary = [
         serving.model_copy(update={"is_primary": False}) for serving in reversed(food.servings)
     ]
-    assert FoodPortion.from_food(food.model_copy(update={"servings": no_primary})).serving.id == 2
+    assert FoodPortion.from_food(food.model_copy(update={"servings": no_primary})).serving.id == "2"
     later_primary = list(reversed(food.servings))
     assert (
-        FoodPortion.from_food(food.model_copy(update={"servings": later_primary})).serving.id == 1
+        FoodPortion.from_food(food.model_copy(update={"servings": later_primary})).serving.id == "1"
     )
 
 
@@ -230,10 +247,12 @@ def test_invalid_selected_serving_has_stable_error(field, value):
 def test_empty_missing_serving_and_validation_precedence():
     food = example_food()
     with pytest.raises(FoodPortionError) as caught:
-        FoodPortion.from_food(food.model_copy(update={"servings": []}), serving_id=999, quantity=0)
+        FoodPortion.from_food(
+            food.model_copy(update={"servings": []}), serving_id="999", quantity=0
+        )
     assert caught.value.code == "no_servings"
     with pytest.raises(FoodPortionError) as caught:
-        FoodPortion.from_food(food, serving_id=999, quantity=0)
+        FoodPortion.from_food(food, serving_id="999", quantity=0)
     assert caught.value.code == "serving_not_found"
     invalid = food.servings[0].model_copy(update={"quantity": 0})
     with pytest.raises(FoodPortionError) as caught:
@@ -271,7 +290,7 @@ def test_does_not_mutate_or_share_mutable_model_state():
 
 @pytest.mark.parametrize("async_mode", [False, True], ids=["sync", "async"])
 def test_portion_selection_works_in_sdk_log_and_glucose_requests(async_mode):
-    portion = FoodPortion.from_food(example_food(), serving_id=2, quantity=4)
+    portion = FoodPortion.from_food(example_food(), serving_id="2", quantity=4)
     assert not inspect.isawaitable(portion)
     with local_service() as service:
 
@@ -304,6 +323,6 @@ def test_portion_selection_works_in_sdk_log_and_glucose_requests(async_mode):
         asyncio.run(run())
         assert len(service["requests"]) == 2
         assert all(
-            request["body"]["foods"] == [{"id": 42, "serving": {"id": 2, "quantity": 4}}]
+            request["body"]["foods"] == [{"food_id": "42", "serving_id": "2", "quantity": 4}]
             for request in service["requests"]
         )

@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BY_ID = {f["operationId"]: f for f in FIXTURES["operations"]}
 
 
-def exercise(mode, responses, *, operation="credits", options=None, transport_error=None):
+def exercise(mode, responses, *, operation="getCredits", options=None, transport_error=None):
     calls, sleeps = [], []
 
     def handle(request):
@@ -128,7 +128,7 @@ def test_code_aware_errors_and_default_retry_budget(mode, status, code, error_ty
 
 
 @pytest.mark.parametrize("mode", ["sync", "asyncio", "trio"])
-@pytest.mark.parametrize("operation", ["mintClientToken", "createFoodLog", "revokeClientTokens"])
+@pytest.mark.parametrize("operation", ["createClientToken", "createFoodLog", "revokeClientTokens"])
 @pytest.mark.parametrize("failure", ["server", "read", "connect", "rate"])
 def test_write_replay_safety(mode, operation, failure):
     response = {"status": 503, "body": {"code": "upstream_error"}, "headers": {"retry-after": "0"}}
@@ -172,8 +172,8 @@ def test_explicit_no_retries_and_retry_after_bounds(mode):
 @pytest.mark.parametrize("mode", ["sync", "asyncio", "trio"])
 def test_retry_recovery_and_jitter(mode):
     response = {"status": 503, "body": {"code": "service_unavailable"}}
-    result, calls, sleeps = exercise(mode, [response, BY_ID["credits"]["response"]])
-    assert isinstance(result, models.CreditsResponseDto)
+    result, calls, sleeps = exercise(mode, [response, BY_ID["getCredits"]["response"]])
+    assert isinstance(result, models.CreditBalance)
     assert len(calls) == 2 and 0.375 <= sleeps[0] <= 0.5
     invalid = {"status": 200, "body": {}}
     result, calls, _ = exercise(mode, [invalid])
@@ -237,18 +237,14 @@ def test_response_correction_roundtrip_keeps_only_returned_model_extensions():
     ):
         user = client.for_user("owner")
         scan = user.food_analysis.analyze_photo(image="https://example.invalid/photo.jpg")
-        user.food_analysis.correct(detections=scan.detections, user_input="smaller portion")
-        assert requests[-1]["detections"][0]["future_detection"] == {"value": 7}
-        assert requests[-1]["detections"][0]["food"]["future_food"] == "extra"
-        with pytest.raises(JanuaryValidationError):
-            user.food_analysis.correct(detections=response["detections"], user_input="smaller")
-        manufactured = models.FoodDetection.model_validate(response["detections"][0])
-        with pytest.raises(JanuaryValidationError):
-            user.food_analysis.correct(detections=[manufactured], user_input="smaller")
+        user.food_analysis.correct(analysis=scan, instruction="smaller portion")
+        assert requests[-1]["analysis"]["detections"][0]["future_detection"] == {"value": 7}
+        assert requests[-1]["analysis"]["detections"][0]["food"]["future_food"] == "extra"
         bad_food = scan.detections[0].food.model_copy(update={"name": 42})
         bad_detection = scan.detections[0].model_copy(update={"food": bad_food})
+        bad_scan = scan.model_copy(update={"detections": [bad_detection]})
         with pytest.raises(JanuaryValidationError):
-            user.food_analysis.correct(detections=[bad_detection], user_input="smaller")
+            user.food_analysis.correct(analysis=bad_scan, instruction="smaller")
     assert len(requests) == 2
     with pytest.raises(JanuaryValidationError):
         Contract().encode({"typo": 1}, {"type": "object", "properties": {}}, "request")
@@ -273,18 +269,16 @@ def test_photo_inputs_are_prepared_before_request(mode):
 
 
 def test_native_timestamps_and_help_keep_wire_contract():
-    log = models.FoodLog(id="log", foods=[], timestamp_utc="opaque legacy value")
-    assert log.timestamp_utc_datetime is None and log.timestamp_utc == "opaque legacy value"
-    timestamp = "2026-08-31T12:30:00Z"
-    log = models.FoodLog(id="log", foods=[], timestamp_utc=timestamp)
-    assert log.timestamp_utc_datetime == datetime(2026, 8, 31, 12, 30, tzinfo=UTC)
+    timestamp = datetime(2026, 8, 31, 12, 30, tzinfo=UTC)
+    log = models.FoodLog(id="log", foods=[], eaten_at=timestamp, name=None)
+    assert log.eaten_at == timestamp
     reading = models.CgmReading.model_validate_json(
         '{"timestamp":"2026-08-31T12:30:00Z","value":100}'
     )
     assert isinstance(reading.timestamp, datetime)
     with January(api_key="sk-offline") as client:
         assert "trusted local path" in (client.food_analysis.analyze_photo.__doc__ or "")
-        assert "end_user_id:" in (client.foods.search.__doc__ or "")
+        assert "query:" in (client.foods.search.__doc__ or "")
 
 
 def test_sync_async_signature_parity():
@@ -325,7 +319,7 @@ def test_async_cancellation_interrupts_retry_wait(backend):
 
             client._transport._sleep = sleep
             async with anyio.create_task_group() as group:
-                group.start_soon(client.credits)
+                group.start_soon(client.get_credits)
                 with anyio.fail_after(2):
                     await sleeping.wait()
                 group.cancel_scope.cancel()
