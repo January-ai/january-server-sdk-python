@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/januaryai-server.svg)](https://pypi.org/project/januaryai-server/)
 [![CI](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 The official Python server SDK for [January AI](https://january.ai).
 Build applications that understand what people eat: identify foods from photos
@@ -41,7 +41,8 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Configuration and type safety](#configuration-and-type-safety)
 - [Examples](#examples)
 - [Versioning and contributing](#versioning-and-contributing)
-- [License and support](#license-and-support)
+- [Support](#support)
+- [License](#license)
 
 ## Getting an API key
 

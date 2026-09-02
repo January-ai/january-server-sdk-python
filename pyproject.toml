@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Typed January server SDK generated from the partner API contract"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{name = "January AI", email = "support@january.ai"}]
 keywords = ["nutrition", "food", "glucose", "api", "sdk"]
