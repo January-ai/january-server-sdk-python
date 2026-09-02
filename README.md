@@ -344,9 +344,12 @@ version in your application.
 
 To contribute a fix, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License and support
+## Support
 
-Released under the [MIT license](LICENSE). For help, contact
-[support@january.ai](mailto:support@january.ai) with a minimal reproduction and
-safe request IDs. Report sensitive issues privately using the
+For help, contact [support@january.ai](mailto:support@january.ai) with a minimal
+reproduction and safe request IDs. Report sensitive issues privately using the
 [security policy](SECURITY.md).
+
+## License
+
+The Apache 2.0 license applies to the source code in this repository. It does not grant rights to nutrition data, food images, or other content returned by the January API, which are subject to the January API Developer Terms.
