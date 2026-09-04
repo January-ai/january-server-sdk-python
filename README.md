@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/januaryai-server.svg)](https://pypi.org/project/januaryai-server/)
 [![CI](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/January-ai/january-server-sdk-python/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 The official Python server SDK for [January AI](https://january.ai).
 Build applications that understand what people eat: identify foods from photos
@@ -30,7 +30,7 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 
 - [Getting an API key](#getting-an-api-key)
 - [Installation and dependencies](#installation-and-dependencies)
-- [Quickstart](#quickstart)
+- [Quick start](#quick-start)
 - [All 20 operations at a glance](#all-20-operations-at-a-glance)
 - [End users and user views](#end-users-and-user-views)
 - [Food analysis and photos](#food-analysis-and-photos)
@@ -41,7 +41,8 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Configuration and type safety](#configuration-and-type-safety)
 - [Examples](#examples)
 - [Versioning and contributing](#versioning-and-contributing)
-- [License and support](#license-and-support)
+- [Support](#support)
+- [License](#license)
 
 ## Getting an API key
 
@@ -88,7 +89,7 @@ The package is named `januaryai-server`; Python imports use `januaryai`.
 Pillow loads lazily when image processing needs it. Async applications can use
 asyncio or Trio; install `trio` separately if your application uses that backend.
 
-## Quickstart
+## Quick start
 
 Create a `.env` file beside your script, containing only your server API key:
 
@@ -333,7 +334,7 @@ for native datetimes and parsed accessors that preserve opaque timestamps.
 | Local portion calculation | [main.py](examples/portions/main.py) |
 | Issue client tokens from your backend | [FastAPI example](examples/fastapi/README.md) |
 
-Follow the [quickstart setup](#quickstart), then run examples from the directory
+Follow the [quick-start setup](#quick-start), then run examples from the directory
 containing your `.env` file. The FastAPI example includes its own setup instructions.
 
 ## Versioning and contributing
