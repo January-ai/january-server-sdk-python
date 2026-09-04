@@ -342,11 +342,11 @@ def test_public_docs_and_examples_do_not_expose_url_overrides():
 
 def test_readme_onboarding_links_and_order():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert readme.index("## Getting an API key") < readme.index(
-        "## Installation and dependencies\n"
+    assert readme.index("### 1. Create and configure a server API key") < readme.index(
+        "### 2. Install, connect, and make the first request\n"
     )
     assert "python -m pip install januaryai-server python-dotenv" in readme
-    assert "JANUARY_API_KEY=your-server-api-key" in readme
+    assert "JANUARY_API_KEY=sk-your-server-api-key" in readme
     assert "test -e .env || cp .env.example .env" in readme
     assert "```gitignore\n.env\n```" in readme
     assert "export JANUARY_API_KEY" not in readme

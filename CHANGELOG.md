@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-09-04
+
+Initial public release.
+
 - Prepare food photos from paths, bytes, file objects and Pillow images, including
   orientation, resizing and compression.
 - Add specific API error classes and parsed Retry-After metadata.

@@ -38,7 +38,7 @@ def test_badges_point_to_our_actual_package_workflow_and_metadata():
 
 
 def test_dependency_constraints_match_the_package():
-    section = README.split("| Dependency |", 1)[1].split("## Quick start", 1)[0]
+    section = README.split("| Dependency |", 1)[1].split("</details>", 1)[0]
     rows = dict(re.findall(r"\| `([^`]+)` \| `([^`]+)` \|", section))
     expected = {}
     for dependency in PROJECT["dependencies"]:
@@ -50,7 +50,7 @@ def test_dependency_constraints_match_the_package():
 
 
 def test_all_20_documented_calls_and_returns_match_the_contract():
-    section = README.split("## All 20 operations at a glance\n", 1)[1].split("## End users", 1)[0]
+    section = README.split("### All 20 operations at a glance\n", 1)[1].split("### End users", 1)[0]
     rows = re.findall(r"^\| `([^`]+)` \| [^|]+ \| `([^`]+)` \|$", section, re.M)
     surface = json.loads((ROOT / "sdk-surface.json").read_text(encoding="utf-8"))["operations"]
     descriptors = json.loads((ROOT / "src/januaryai/_contract.json").read_text(encoding="utf-8"))[
@@ -102,7 +102,9 @@ def test_contents_and_local_links_resolve():
 
 
 def test_quickstart_stays_short_and_matches_the_executable_example():
-    section = README.split("## Quick start\n", 1)[1].split("## All 20 operations", 1)[0]
+    section = README.split("## Quick start\n", 1)[1].split("## Detailed setup and credentials", 1)[
+        0
+    ]
     match = re.search(r"```python\n(.*?)```", section, re.S)
     assert match is not None
     code = match.group(1)
