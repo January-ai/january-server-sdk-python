@@ -38,7 +38,7 @@ def test_badges_point_to_our_actual_package_workflow_and_metadata():
 
 
 def test_dependency_constraints_match_the_package():
-    section = README.split("| Dependency |", 1)[1].split("## Quickstart", 1)[0]
+    section = README.split("| Dependency |", 1)[1].split("## Quick start", 1)[0]
     rows = dict(re.findall(r"\| `([^`]+)` \| `([^`]+)` \|", section))
     expected = {}
     for dependency in PROJECT["dependencies"]:
@@ -102,7 +102,7 @@ def test_contents_and_local_links_resolve():
 
 
 def test_quickstart_stays_short_and_matches_the_executable_example():
-    section = README.split("## Quickstart\n", 1)[1].split("## All 20 operations", 1)[0]
+    section = README.split("## Quick start\n", 1)[1].split("## All 20 operations", 1)[0]
     match = re.search(r"```python\n(.*?)```", section, re.S)
     assert match is not None
     code = match.group(1)

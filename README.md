@@ -30,7 +30,7 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 
 - [Getting an API key](#getting-an-api-key)
 - [Installation and dependencies](#installation-and-dependencies)
-- [Quickstart](#quickstart)
+- [Quick start](#quick-start)
 - [All 20 operations at a glance](#all-20-operations-at-a-glance)
 - [End users and user views](#end-users-and-user-views)
 - [Food analysis and photos](#food-analysis-and-photos)
@@ -88,7 +88,7 @@ The package is named `januaryai-server`; Python imports use `januaryai`.
 Pillow loads lazily when image processing needs it. Async applications can use
 asyncio or Trio; install `trio` separately if your application uses that backend.
 
-## Quickstart
+## Quick start
 
 Create a `.env` file beside your script, containing only your server API key:
 
