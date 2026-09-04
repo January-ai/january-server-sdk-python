@@ -41,7 +41,8 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 - [Configuration and type safety](#configuration-and-type-safety)
 - [Examples](#examples)
 - [Versioning and contributing](#versioning-and-contributing)
-- [License and support](#license-and-support)
+- [Support](#support)
+- [License](#license)
 
 ## Getting an API key
 
@@ -333,7 +334,7 @@ for native datetimes and parsed accessors that preserve opaque timestamps.
 | Local portion calculation | [main.py](examples/portions/main.py) |
 | Issue client tokens from your backend | [FastAPI example](examples/fastapi/README.md) |
 
-Follow the [quickstart setup](#quickstart), then run examples from the directory
+Follow the [quick-start setup](#quick-start), then run examples from the directory
 containing your `.env` file. The FastAPI example includes its own setup instructions.
 
 ## Versioning and contributing
