@@ -5,22 +5,12 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-The official Python server SDK for [January AI](https://january.ai).
-Build applications that understand what people eat: identify foods from photos
-or descriptions, look up nutrition and serving sizes, keep food diaries, and
-predict glucose responses.
+Use January's food search, barcode lookup, food analysis, food logs, and glucose
+prediction from a trusted Python backend. Includes synchronous and asynchronous
+clients, local serving calculations, and server-only token and credit operations.
 
-The SDK provides typed synchronous and asynchronous clients, automatic photo
-preparation, automatic retries and immutable user-scoped views.
-
-- **Understand food:** analyze a photo or description, then correct the result in plain language.
-- **Find nutrition:** search foods, look up barcodes, explore alternatives and restaurant menus.
-- **Work with portions:** recalculate nutrients locally by serving and quantity.
-- **Build per-user experiences:** manage food logs and request glucose predictions.
-- **Connect mobile and web apps:** mint client tokens on your backend, revoke them and check credits.
-
-Use this SDK on trusted servers, in jobs or in local scripts. Keep server
-`sk-` keys out of mobile apps and browsers.
+Requires Python 3.11+. Server API keys must never be shipped to browsers or
+mobile apps.
 
 [API reference](https://partners.january.ai/v1.2/docs#/) ·
 [Developer dashboard](https://dashboard.january.ai/dashboard) ·
@@ -28,23 +18,72 @@ Use this SDK on trusted servers, in jobs or in local scripts. Keep server
 
 ## Contents
 
-- [Getting an API key](#getting-an-api-key)
-- [Installation and dependencies](#installation-and-dependencies)
 - [Quick start](#quick-start)
-- [All 20 operations at a glance](#all-20-operations-at-a-glance)
-- [End users and user views](#end-users-and-user-views)
-- [Food analysis and photos](#food-analysis-and-photos)
-- [Portions and serving sizes](#portions-and-serving-sizes)
-- [Server-only APIs](#server-only-apis)
+- [Detailed setup and credentials](#detailed-setup-and-credentials)
+- [Common tasks](#common-tasks)
+- [Server-only operations](#server-only-operations)
 - [Async usage](#async-usage)
-- [Errors and retries](#errors-and-retries)
-- [Configuration and type safety](#configuration-and-type-safety)
-- [Examples](#examples)
-- [Versioning and contributing](#versioning-and-contributing)
-- [Support](#support)
+- [Configuration and errors](#configuration-and-errors)
+- [Examples and testing](#examples-and-testing)
+- [Distribution and releases](#distribution-and-releases)
+- [Reference, support, and contributing](#reference-support-and-contributing)
 - [License](#license)
 
-## Getting an API key
+## Quick start
+
+### 1. Create and configure a server API key
+
+[Sign in to the Developer Dashboard](https://dashboard.january.ai/dashboard),
+open **API keys → Create key**, and copy the full `sk-…` value when it is shown.
+Keep it on your trusted backend and never commit it or ship it to a browser or
+mobile app.
+
+Create `.env` in your application directory:
+
+```dotenv
+JANUARY_API_KEY=sk-your-server-api-key
+```
+
+### 2. Install, connect, and make the first request
+
+```sh
+python -m pip install januaryai-server python-dotenv
+```
+
+Save this as `quickstart.py`:
+
+<!-- quickstart:minimal.py -->
+```python
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from januaryai import January
+
+load_dotenv(Path.cwd() / ".env", override=False)
+
+with January(max_retries=0) as client:
+    user = client.for_user("january-quickstart", end_user_timezone="UTC")
+    foods = user.foods.search(query="banana")
+
+print(f"Foods returned: {len(foods.items)}")
+if foods.items:
+    print(f"First food: {foods.items[0].name}")
+```
+
+Run it with `python quickstart.py`. A successful request prints a result count;
+an empty result is still a successful connection. Replace the synthetic ID with
+the stable ID from your authenticated server session. This read-only request may
+consume API credits.
+
+This server SDK accepts server API keys (`sk-…`), not client tokens (`ct-…`).
+Client tokens are needed only when your backend serves a browser or mobile app;
+see [server-only operations](#server-only-operations) for token creation.
+
+## Detailed setup and credentials
+
+<details>
+<summary>Account, billing, and dependency details</summary>
 
 1. [Sign up](https://dashboard.january.ai/sign-up) or
    [sign in](https://dashboard.january.ai/sign-in) to the developer platform.
@@ -61,7 +100,7 @@ You do not need to enable client tokens to search foods or analyze a photo.
 API calls may consume credits. Check your plan and allowance in
 [Billing](https://dashboard.january.ai/billing), or call `client.get_credits()`.
 
-## Installation and dependencies
+### Package installation
 
 Requires **Python 3.11+**. Install into your project's virtual environment:
 
@@ -89,15 +128,7 @@ The package is named `januaryai-server`; Python imports use `januaryai`.
 Pillow loads lazily when image processing needs it. Async applications can use
 asyncio or Trio; install `trio` separately if your application uses that backend.
 
-## Quick start
-
-Create a `.env` file beside your script, containing only your server API key:
-
-```dotenv
-JANUARY_API_KEY=your-server-api-key
-```
-
-Add it to your project's `.gitignore`:
+Add the local environment file to your project's `.gitignore`:
 
 ```gitignore
 .env
@@ -110,36 +141,15 @@ an existing file:
 test -e .env || cp .env.example .env
 ```
 
-Save the following as `quickstart.py`, then run `python quickstart.py` from that
-directory. It makes one food-search request to January's built-in production endpoint.
-
-<!-- quickstart:minimal.py -->
-```python
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-from januaryai import January
-
-load_dotenv(Path.cwd() / ".env", override=False)
-
-with January(max_retries=0) as client:
-    user = client.for_user("january-quickstart", end_user_timezone="UTC")
-    foods = user.foods.search(query="banana")
-
-print(f"Foods returned: {len(foods.items)}")
-if foods.items:
-    print(f"First food: {foods.items[0].name}")
-```
-
-You get a result count and the first food name, if any. An empty `items` list is
-a valid result. Replace the example user ID with your authenticated user's ID.
-
 `January()` reads `JANUARY_API_KEY` from the environment. Your application loads
 the `.env`; the SDK never searches for one. Existing environment values take
 precedence. The example disables retries to keep it to one request.
 
-## All 20 operations at a glance
+</details>
+
+## Common tasks
+
+### All 20 operations at a glance
 
 The table uses an open `client` and a `user = client.for_user(...)` view.
 Calls show the main arguments; replace `...` with your application's values.
@@ -173,7 +183,7 @@ identity for food-log operations; account-scoped reads do not send user headers.
 The last three operations are server-only and are not exposed by a user view.
 Your editor shows optional arguments and typed response fields through autocomplete.
 
-## End users and user views
+### End users and user views
 
 An end-user ID is your application's stable identifier for the person the
 request belongs to. Food logs need that identity; it keeps one user's diary
@@ -187,7 +197,7 @@ client or other views.
 Use an IANA timezone such as `America/New_York` when calendar days should follow
 the user's local time. Only operations declaring that header receive it.
 
-## Food analysis and photos
+### Food analysis and photos
 
 A photo and a written description both return `FoodScan`: recognized foods,
 serving options and nutrition. `food_analysis.correct` accepts the returned
@@ -225,7 +235,7 @@ Never treat an untrusted user's string as a local file path. Invalid local
 images raise `ValueError`, `TypeError` or `FileNotFoundError` before HTTP.
 See the [analysis → correction → logging recipe](docs/recipes.md#analyze-correct-then-log).
 
-## Portions and serving sizes
+### Portions and serving sizes
 
 `FoodPortion` recalculates nutrition locally, without API calls or credits.
 Given a `food` returned by the API:
@@ -247,7 +257,7 @@ The utility also works with async results. See the
 [serving-selection recipe](docs/recipes.md#search-choose-a-serving-calculate-locally-then-log)
 and [runnable portion example](examples/portions/main.py).
 
-## Server-only APIs
+## Server-only operations
 
 `client.get_credits()`, `client.create_client_token(...)` and
 `client.revoke_client_tokens(...)` operate on the root client, never a user view.
@@ -276,7 +286,9 @@ Copy the complete [async quickstart](examples/quickstart/async_main.py) to
 `quickstart_async.py`, then run `python quickstart_async.py` with the same `.env`.
 For multiple photos, see the [bounded-concurrency example](examples/analysis/concurrent.py).
 
-## Errors and retries
+## Configuration and errors
+
+### Errors and retries
 
 Catch specific API errors when your application can act on them:
 
@@ -305,7 +317,7 @@ connection timeout. Override using `timeout=`; use `max_retries=0` for one attem
 See [configuration and error details](docs/configuration.md) for retry budgets,
 HTTPX phase timeouts, cancellation and transport error types.
 
-## Configuration and type safety
+### Type safety and client configuration
 
 The only required configuration is your API key. `January()` reads
 `JANUARY_API_KEY`; `api_key=` overrides it. Existing `secret_key=` calls remain
@@ -323,7 +335,7 @@ Use `model_dump(mode="json", exclude_unset=True)` for JSON-ready output that
 preserves omissions. See [configuration and type-safety details](docs/configuration.md)
 for native datetimes and parsed accessors that preserve opaque timestamps.
 
-## Examples
+## Examples and testing
 
 | Example or guide | Start here |
 | --- | --- |
@@ -337,19 +349,24 @@ for native datetimes and parsed accessors that preserve opaque timestamps.
 Follow the [quick-start setup](#quick-start), then run examples from the directory
 containing your `.env` file. The FastAPI example includes its own setup instructions.
 
-## Versioning and contributing
+## Distribution and releases
 
 The SDK targets API `/v1.2`; package versions are separate from API versions.
 See the [changelog](CHANGELOG.md) before upgrading and pin a compatible package
 version in your application.
 
-To contribute a fix, see [CONTRIBUTING.md](CONTRIBUTING.md).
+PyPI releases are built and published by the tag-triggered GitHub Actions
+workflow using PyPI Trusted Publishing; maintainers do not store a long-lived
+PyPI token in GitHub. See [RELEASING.md](RELEASING.md) for the first-publication
+setup and release checklist.
 
-## Support
+## Reference, support, and contributing
 
 For help, contact [support@january.ai](mailto:support@january.ai) with a minimal
 reproduction and safe request IDs. Report sensitive issues privately using the
 [security policy](SECURITY.md).
+
+To contribute a fix, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
