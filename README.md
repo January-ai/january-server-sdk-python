@@ -80,6 +80,10 @@ This server SDK accepts server API keys (`sk-…`), not client tokens (`ct-…`)
 Client tokens are needed only when your backend serves a browser or mobile app;
 see [server-only operations](#server-only-operations) for token creation.
 
+For v1.2 food-log requests, this SDK sends the canonical
+`January-End-User-ID` header. The legacy `x-end-user-id` name is deprecated;
+use the canonical name in new integrations.
+
 ## Detailed setup and credentials
 
 <details>
