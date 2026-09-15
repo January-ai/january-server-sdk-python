@@ -18,12 +18,13 @@ class SyncFoods(SyncResource):
         query: str,
         type_: FoodCategoryInput | UnsetType = UNSET,
         limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodSearchResults:
-        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return in one call. Values above 50 are treated as 50, so page by 50 if you asked for more.\n    offset: Number of results to skip, for paging: a page shorter than `limit` is the last one.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchResults, self._transport.request(
-            "searchFoods", {"query": query, "type_": type_, "limit": limit}, FoodSearchResults, self._context, timeout, cancel_event,
+            "searchFoods", {"query": query, "type_": type_, "limit": limit, "offset": offset}, FoodSearchResults, self._context, timeout, cancel_event,
         ))
 
     def autocomplete(
@@ -124,13 +125,14 @@ class SyncFoodAnalysis(SyncResource):
     def analyze_photo(
         self, *,
         image: ImageInput,
+        reasoning: AnalysisReasoning | AnalysisReasoningInput | UnsetType = UNSET,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
-            "scanFoodPhoto", {"image": image, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
+            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
         ))
 
     def analyze_description(
@@ -181,9 +183,25 @@ class SyncFoodLogs(SyncResource):
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers — required, so the upstream groups by the same days the caller means.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, self._transport.request(
             "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout, cancel_event,
+        ))
+
+    def get_summary(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        group_by: Literal["day", "week"] | UnsetType = UNSET,
+        week_start: Literal["monday", "sunday"] | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> FoodLogSummary:
+        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodLogSummary, self._transport.request(
+            "getFoodLogSummary", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "group_by": group_by, "week_start": week_start}, FoodLogSummary, self._context, timeout, cancel_event,
         ))
 
     def get(
@@ -308,11 +326,12 @@ class AsyncFoods(AsyncResource):
         query: str,
         type_: FoodCategoryInput | UnsetType = UNSET,
         limit: int | UnsetType = UNSET,
+        offset: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodSearchResults:
-        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Search foods by name and return matching foods with nutrition and servings.\n\nArgs:\n    query: The food name to search for.\n    type_: Narrows results to one kind of food. Omitted, all three are searched and returned as one ranked list, so a partner who does not care which kind a match is does not have to ask three times.\n    limit: Maximum number of results to return in one call. Values above 50 are treated as 50, so page by 50 if you asked for more.\n    offset: Number of results to skip, for paging: a page shorter than `limit` is the last one.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodSearchResults.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodSearchResults, await self._transport.request(
-            "searchFoods", {"query": query, "type_": type_, "limit": limit}, FoodSearchResults, self._context, timeout,
+            "searchFoods", {"query": query, "type_": type_, "limit": limit, "offset": offset}, FoodSearchResults, self._context, timeout,
         ))
 
     async def autocomplete(
@@ -406,12 +425,13 @@ class AsyncFoodAnalysis(AsyncResource):
     async def analyze_photo(
         self, *,
         image: ImageInput,
+        reasoning: AnalysisReasoning | AnalysisReasoningInput | UnsetType = UNSET,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
-            "scanFoodPhoto", {"image": image, "preprocess": preprocess}, FoodScan, self._context, timeout,
+            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout,
         ))
 
     async def analyze_description(
@@ -458,9 +478,24 @@ class AsyncFoodLogs(AsyncResource):
         timezone: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers — required, so the upstream groups by the same days the caller means.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, await self._transport.request(
             "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout,
+        ))
+
+    async def get_summary(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        group_by: Literal["day", "week"] | UnsetType = UNSET,
+        week_start: Literal["monday", "sunday"] | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> FoodLogSummary:
+        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(FoodLogSummary, await self._transport.request(
+            "getFoodLogSummary", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "group_by": group_by, "week_start": week_start}, FoodLogSummary, self._context, timeout,
         ))
 
     async def get(
