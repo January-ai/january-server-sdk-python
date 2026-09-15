@@ -98,6 +98,12 @@
       "audience": "shared"
     },
     {
+      "operationId": "getFoodLogSummary",
+      "resource": "food_logs",
+      "method": "get_summary",
+      "audience": "shared"
+    },
+    {
       "operationId": "getFoodLog",
       "resource": "food_logs",
       "method": "get",

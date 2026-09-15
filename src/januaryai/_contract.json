@@ -10,7 +10,7 @@
         },
         "code": {
           "type": "string",
-          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Two more the status code alone gets wrong: `credit_limit_exceeded` is a 429 that **must never be retried** — the allowance returns next calendar month, so a client that backs off on every 429 will spin until then; and `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.",
+          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.",
           "example": "invalid_request"
         }
       },
@@ -512,7 +512,7 @@
       },
       "x-january-upstream-schema": "SuggestFoodAlternativesRequest"
     },
-    "AlternativeServing": {
+    "ServingSummary": {
       "type": "object",
       "properties": {
         "id": {
@@ -569,7 +569,7 @@
           "description": "Servings to read the nutrition against. Empty when the recommender returned none — the key itself is always present.",
           "type": "array",
           "items": {
-            "$ref": "#/components/schemas/AlternativeServing"
+            "$ref": "#/components/schemas/ServingSummary"
           }
         }
       },
@@ -842,55 +842,48 @@
       ],
       "x-january-upstream-schema": "MenuItemSearchResponse"
     },
+    "AnalysisReasoning": {
+      "type": "object",
+      "properties": {
+        "effort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "xhigh"
+          ],
+          "example": "xhigh",
+          "description": "`none` uses the standard analyzer; `xhigh` uses the reasoning-based analyzer."
+        }
+      },
+      "required": [
+        "effort"
+      ],
+      "x-january-upstream-schema": "Reasoning"
+    },
     "ScanFoodPhotoBody": {
       "type": "object",
       "properties": {
         "image": {
           "type": "string",
           "description": "The food photo — the food itself or a packaged product's label — as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Formats: JPG, PNG, WEBP, and non-animated GIF. Around 1,024 px on the shorter side is enough for reliable results (a recommendation, not a validation rule). A URL must be publicly fetchable server-side — hosts that block hotlinking or require a login cannot be read — and has no enforced size cap, though very large files slow the analysis and can time out. Base64 must be a complete data URI and fit the 5 MB request-body cap, so keep raw images under ~3.5 MB before encoding (base64 inflates by ~33%). Prefer the URL when the image is already hosted.",
-          "example": "https://i.imgur.com/bTQIGxf.png"
+          "example": "https://january-food-image-dataset-public.s3.us-east-1.amazonaws.com/salmon-green-beans-potatoes.jpg"
+        },
+        "reasoning": {
+          "default": {
+            "effort": "none"
+          },
+          "description": "Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/AnalysisReasoning"
+            }
+          ]
         }
       },
       "required": [
         "image"
       ],
       "x-january-upstream-schema": "ImageFoodAnalysisRequest"
-    },
-    "DetectedServing": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "nullable": true,
-          "example": "34237662",
-          "description": "Null only when the producer sent a serving with no id."
-        },
-        "quantity": {
-          "type": "number",
-          "nullable": true,
-          "example": 1,
-          "description": "How much of `unit` this serving is; null when the producer reported none."
-        },
-        "unit": {
-          "type": "string",
-          "nullable": true,
-          "example": "cup",
-          "description": "Null only when the producer sent a serving with no unit."
-        },
-        "selected_quantity": {
-          "type": "number",
-          "nullable": true,
-          "description": "Quantity parsed from the text ('2 cups' → 2); null on image analyses. Advisory — corrections reads the serving's own quantity.",
-          "example": 2
-        }
-      },
-      "required": [
-        "id",
-        "quantity",
-        "unit",
-        "selected_quantity"
-      ],
-      "x-january-upstream-schema": "DetectionServing"
     },
     "DetectedFood": {
       "type": "object",
@@ -913,23 +906,36 @@
           "example": null,
           "description": "Null for generic (non-branded) foods."
         },
-        "nutrients": {
-          "$ref": "#/components/schemas/NutritionFacts"
+        "quantity": {
+          "type": "number",
+          "nullable": true,
+          "description": "Number of catalog servings consumed, ready to use as food-log quantity. For 40 g from a 100 g serving this is 0.4. Null when the producer supplied no usable portion.",
+          "example": 0.4
         },
-        "servings": {
-          "description": "Never empty: every detection producer guarantees at least one serving.",
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/DetectedServing"
-          }
+        "serving": {
+          "description": "Selected catalog serving definition; its quantity is the size of one serving, not the amount eaten.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/ServingSummary"
+            }
+          ]
+        },
+        "nutrients": {
+          "description": "Nutrition for the consumed portion, already scaled by quantity.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
         }
       },
       "required": [
         "id",
         "name",
         "brand_name",
-        "nutrients",
-        "servings"
+        "quantity",
+        "serving",
+        "nutrients"
       ],
       "x-january-upstream-schema": "DetectedFood"
     },
@@ -1231,6 +1237,160 @@
         "items"
       ],
       "x-january-upstream-schema": "FoodLogList"
+    },
+    "FoodLogSummaryBucket": {
+      "type": "object",
+      "properties": {
+        "start_date": {
+          "type": "string",
+          "example": "2024-09-01",
+          "format": "date",
+          "description": "First local calendar date this bucket covers. Clipped to the requested range, so the first week bucket may be partial."
+        },
+        "end_date": {
+          "type": "string",
+          "example": "2024-09-07",
+          "format": "date",
+          "description": "Last local calendar date this bucket covers, inclusive. Equal to start_date when grouping by day."
+        },
+        "logs_count": {
+          "type": "integer",
+          "example": 5,
+          "description": "How many logs fall in this bucket."
+        },
+        "days_with_logs": {
+          "type": "integer",
+          "example": 3,
+          "description": "How many distinct local calendar dates in this bucket carry at least one log."
+        },
+        "nutrients": {
+          "description": "Nutrients summed over this bucket. A key is absent when no value was available; `{}` means nothing could be totalled — read `logs_count` to tell an empty bucket from one whose logs were unresolvable.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        }
+      },
+      "required": [
+        "start_date",
+        "end_date",
+        "logs_count",
+        "days_with_logs",
+        "nutrients"
+      ],
+      "x-january-upstream-schema": "FoodLogSummaryBucket"
+    },
+    "FoodLogSummaryTotals": {
+      "type": "object",
+      "properties": {
+        "logs_count": {
+          "type": "integer",
+          "example": 41,
+          "description": "Logs in the whole range."
+        },
+        "days_with_logs": {
+          "type": "integer",
+          "example": 28,
+          "description": "Distinct local calendar dates in the range that carry at least one log."
+        },
+        "nutrients": {
+          "description": "Nutrients summed over the whole range, with the same sparseness as a bucket’s.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        }
+      },
+      "required": [
+        "logs_count",
+        "days_with_logs",
+        "nutrients"
+      ],
+      "x-january-upstream-schema": "FoodLogSummaryTotals"
+    },
+    "FoodLogSummaryAverage": {
+      "type": "object",
+      "properties": {
+        "nutrients": {
+          "description": "Totals divided by `totals.days_with_logs` — an average over days that were logged, not over days in the range. `{}` when none were.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        }
+      },
+      "required": [
+        "nutrients"
+      ],
+      "x-january-upstream-schema": "FoodLogSummaryAverage"
+    },
+    "FoodLogSummary": {
+      "type": "object",
+      "properties": {
+        "group_by": {
+          "type": "string",
+          "enum": [
+            "day",
+            "week"
+          ],
+          "example": "week",
+          "description": "The bucket size used, echoing the request."
+        },
+        "week_start": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "monday",
+            "sunday"
+          ],
+          "example": "monday",
+          "description": "The weekday week buckets begin on. Always present; `null` when `group_by=day`, where it does not apply."
+        },
+        "timezone": {
+          "type": "string",
+          "example": "America/Los_Angeles",
+          "description": "The IANA timezone the buckets were cut in — the canonical spelling of what was requested."
+        },
+        "start_date": {
+          "type": "string",
+          "example": "2024-09-01",
+          "format": "date",
+          "description": "First local calendar date of the summarized range, echoing the request."
+        },
+        "end_date": {
+          "type": "string",
+          "example": "2024-09-30",
+          "format": "date",
+          "description": "Last local calendar date of the summarized range, inclusive."
+        },
+        "buckets": {
+          "description": "The buckets tiling the range, in chronological order and covering it end to end — a day or week with no logs is returned with zero counts rather than skipped.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/FoodLogSummaryBucket"
+          }
+        },
+        "totals": {
+          "$ref": "#/components/schemas/FoodLogSummaryTotals"
+        },
+        "average_per_logged_day": {
+          "$ref": "#/components/schemas/FoodLogSummaryAverage"
+        }
+      },
+      "required": [
+        "group_by",
+        "week_start",
+        "timezone",
+        "start_date",
+        "end_date",
+        "buckets",
+        "totals",
+        "average_per_logged_day"
+      ],
+      "x-january-upstream-schema": "FoodLogSummary"
     },
     "UpdateFoodLogBody": {
       "type": "object",
@@ -1904,14 +2064,26 @@
           "name": "limit",
           "required": false,
           "in": "query",
-          "description": "Maximum number of results to return.",
+          "description": "Maximum number of results to return in one call. Values above 50 are treated as 50, so page by 50 if you asked for more.",
           "schema": {
             "minimum": 1,
-            "maximum": 40,
+            "maximum": 50,
             "default": 10,
             "type": "integer"
           },
           "publicName": "limit"
+        },
+        {
+          "name": "offset",
+          "required": false,
+          "in": "query",
+          "description": "Number of results to skip, for paging: a page shorter than `limit` is the last one.",
+          "schema": {
+            "minimum": 0,
+            "default": 0,
+            "type": "integer"
+          },
+          "publicName": "offset"
         }
       ],
       "fields": [],
@@ -2394,9 +2566,25 @@
           "schema": {
             "type": "string",
             "description": "The food photo — the food itself or a packaged product's label — as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Formats: JPG, PNG, WEBP, and non-animated GIF. Around 1,024 px on the shorter side is enough for reliable results (a recommendation, not a validation rule). A URL must be publicly fetchable server-side — hosts that block hotlinking or require a login cannot be read — and has no enforced size cap, though very large files slow the analysis and can time out. Base64 must be a complete data URI and fit the 5 MB request-body cap, so keep raw images under ~3.5 MB before encoding (base64 inflates by ~33%). Prefer the URL when the image is already hosted.",
-            "example": "https://i.imgur.com/bTQIGxf.png"
+            "example": "https://january-food-image-dataset-public.s3.us-east-1.amazonaws.com/salmon-green-beans-potatoes.jpg"
           },
           "required": true
+        },
+        {
+          "name": "reasoning",
+          "publicName": "reasoning",
+          "schema": {
+            "default": {
+              "effort": "none"
+            },
+            "description": "Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisReasoning"
+              }
+            ]
+          },
+          "required": false
         }
       ],
       "bodySchema": {
@@ -2629,7 +2817,7 @@
           "name": "timezone",
           "required": true,
           "in": "query",
-          "description": "IANA timezone that defines the local calendar days this range covers — required, so the upstream groups by the same days the caller means.",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.",
           "schema": {
             "example": "America/Los_Angeles",
             "type": "string"
@@ -2645,6 +2833,107 @@
         }
       },
       "responseType": "ListFoodLogsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
+    },
+    "getFoodLogSummary": {
+      "operationId": "getFoodLogSummary",
+      "method": "GET",
+      "path": "/v1.2/food-logs/summary",
+      "resource": "foodLogs",
+      "publicMethod": "getSummary",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "start_date",
+          "required": true,
+          "in": "query",
+          "description": "First local calendar date in `timezone`, inclusive.",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-01",
+            "type": "string"
+          },
+          "publicName": "start_date"
+        },
+        {
+          "name": "end_date",
+          "required": true,
+          "in": "query",
+          "description": "Last local calendar date in `timezone`, inclusive. May equal start_date for a single day. The inclusive range may not exceed 366 calendar days.",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-30",
+            "type": "string"
+          },
+          "publicName": "end_date"
+        },
+        {
+          "name": "timezone",
+          "required": true,
+          "in": "query",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.",
+          "schema": {
+            "example": "America/Los_Angeles",
+            "type": "string"
+          },
+          "publicName": "timezone"
+        },
+        {
+          "name": "group_by",
+          "required": false,
+          "in": "query",
+          "description": "Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.",
+          "schema": {
+            "default": "day",
+            "enum": [
+              "day",
+              "week"
+            ],
+            "type": "string"
+          },
+          "publicName": "group_by"
+        },
+        {
+          "name": "week_start",
+          "required": false,
+          "in": "query",
+          "description": "Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.",
+          "schema": {
+            "default": "monday",
+            "enum": [
+              "monday",
+              "sunday"
+            ],
+            "type": "string"
+          },
+          "publicName": "week_start"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/FoodLogSummary"
+        }
+      },
+      "responseType": "FoodLogSummary",
       "retryNever": false,
       "retryAmbiguous": true,
       "photoPreparation": false
