@@ -414,7 +414,7 @@ def test_manifest_matches_public_methods():
         Path(__file__).parents[1].joinpath("sdk-surface.json").read_text(encoding="utf-8")
     )
     assert manifest["language"] == "python"
-    assert len(manifest["operations"]) == 20
+    assert len(manifest["operations"]) == 21
     for client_type in [January, AsyncJanuary]:
         client = client_type(secret_key="sk-local-fixture")
         for op in manifest["operations"]:

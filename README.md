@@ -153,7 +153,7 @@ precedence. The example disables retries to keep it to one request.
 
 ## Common tasks
 
-### All 20 operations at a glance
+### All 21 operations at a glance
 
 The table uses an open `client` and a `user = client.for_user(...)` view.
 Calls show the main arguments; replace `...` with your application's values.
@@ -175,6 +175,7 @@ All arguments are keyword-only. Async clients expose the same methods with `awai
 | `user.food_logs.create(foods=...)` | Record a meal for a user | `FoodLog` |
 | `user.food_logs.list(start_date=..., end_date=..., timezone=...)` | List food logs within a date range | `ListFoodLogsResponse` |
 | `user.food_logs.get(log_id=...)` | Retrieve one food log | `FoodLog` |
+| `user.food_logs.get_summary(start_date=..., end_date=..., timezone=...)` | Sum nutrients per day or week over a date range | `FoodLogSummary` |
 | `user.food_logs.update(log_id=..., name=...)` | Update a food log's supplied fields | `FoodLog` |
 | `user.food_logs.delete(log_id=...)` | Delete a food log | `ResponseMetadata` |
 | `user.glucose.predict(user_profile=..., timezone=..., foods=..., start_time=...)` | Predict a meal's glucose response | `GlucosePrediction` |
