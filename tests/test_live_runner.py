@@ -123,6 +123,11 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 # One day bucket per date in the requested range, counting only the logs
                 # eaten on that date, the way the API buckets them.
                 query = parse_qs(location.query)
+                # The offline service models only UTC day buckets; make any other
+                # request fail loudly instead of being silently misrepresented.
+                assert query.get("group_by", ["day"]) == ["day"], query
+                assert query["timezone"] == ["UTC"], query
+                assert "week_start" not in query, query
                 start = date.fromisoformat(query["start_date"][0])
                 end = date.fromisoformat(query["end_date"][0])
                 eaten_dates = [log["eaten_at"][:10] for log in state["logs"].get(user, {}).values()]
