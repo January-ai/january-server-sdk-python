@@ -188,6 +188,7 @@ def test_bad_retry_after(value):
 def test_http_date_retry_after_and_code_precedence():
     assert parse_retry_after("Wed, 01 Jan 2020 00:00:00 GMT") == 0
     assert not should_retry_response(503, "credit_limit_exceeded")
+    assert not should_retry_response(429, "request_limit_exceeded")
     assert not should_retry_response(503, "invalid_request")
 
 

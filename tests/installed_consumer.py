@@ -174,7 +174,7 @@ def main():
                     assert_request(service["requests"][-1], fixture)
 
         asyncio.run(run())
-        assert len(service["requests"]) == 40
+        assert len(service["requests"]) == 42
         from PIL import Image
 
         fixtures = {item["operationId"]: item for item in FIXTURES["operations"]}
@@ -197,9 +197,9 @@ def main():
                 "value": 7
             }
             assert isinstance(client.get_credits(), models.CreditBalance)
-        assert len(service["requests"]) == 44 and not service["responses"]
+        assert len(service["requests"]) == 46 and not service["responses"]
     print(
-        "Installed package: FoodPortion, 20 sync + 20 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
+        "Installed package: FoodPortion, 21 sync + 21 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
     )
 
 

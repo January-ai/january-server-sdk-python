@@ -73,11 +73,15 @@ def service(fail=None, revoke_count=1, hide_logs=False):
             from urllib.parse import parse_qs, unquote, urlsplit
 
             location = urlsplit(self.path)
-            fixture = next(
-                f
-                for f in FIXTURES
-                if f["method"] == self.command
-                and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", f["path"]), location.path)
+            # A literal path (food-logs/summary) beats a templated one (food-logs/{id}).
+            fixture = min(
+                (
+                    f
+                    for f in FIXTURES
+                    if f["method"] == self.command
+                    and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", f["path"]), location.path)
+                ),
+                key=lambda f: f["path"].count("{"),
             )
             op = fixture["operationId"]
             response = deepcopy(fixture["response"])
@@ -115,6 +119,11 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"] = {"items": list(state["logs"].get(user, {}).values())}
                 if hide_logs:
                     response["body"] = {"items": []}
+            if op == "getFoodLogSummary":
+                count = len(state["logs"].get(user, {}))
+                response["body"]["totals"]["logs_count"] = count
+                for bucket in response["body"]["buckets"]:
+                    bucket["logs_count"] = count
             if op == "getFoodLog":
                 log_id = unquote(location.path.rsplit("/", 1)[1])
                 response["body"] = deepcopy(state["logs"][user][log_id])
@@ -234,7 +243,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 40}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 42}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -244,16 +253,16 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_20_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_21_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 42  # 20 + one client-token probe per mode.
+        assert len(state["requests"]) == 44  # 21 + one client-token probe per mode.
         assert len(state["revocations"]) == 2
         assert len(set(state["revocations"])) == 2
         assert all(
@@ -289,9 +298,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 76
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 78
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 
