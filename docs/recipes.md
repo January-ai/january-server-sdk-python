@@ -22,15 +22,11 @@ with January(max_retries=0) as client:
     selections = [
         {
             "food_id": item.food.id,
-            "serving_id": item.food.servings[0].id,
-            "quantity": item.food.servings[0].selected_quantity
-            or item.food.servings[0].quantity
-            or 1,
+            "serving_id": item.food.serving.id,
+            "quantity": item.food.quantity or 1,
         }
         for item in corrected.detections
-        if item.food.id is not None
-        and item.food.servings
-        and item.food.servings[0].id is not None
+        if item.food.id is not None and item.food.serving.id is not None
     ]
     if selections:
         log = user.food_logs.create(foods=selections, name="Lunch")
