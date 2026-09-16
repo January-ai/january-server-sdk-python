@@ -306,6 +306,7 @@ Catch specific API errors when your application can act on them:
 | `PayloadTooLargeError` | Reduce or prepare the image |
 | `RateLimitError` | Respect `retry_after` when retries are exhausted |
 | `CreditLimitExceededError` | Check [Billing](https://dashboard.january.ai/billing); retrying will not fix an exhausted allowance |
+| `RequestLimitExceededError` | The monthly request allowance reopens next month; retrying will not fix it |
 | `InternalServerError` | Handle a server or upstream failure |
 
 All of these inherit from `JanuaryAPIError`. Errors expose safe metadata such as

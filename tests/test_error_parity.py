@@ -29,6 +29,7 @@ from januaryai import (
     PayloadTooLargeError,
     PermissionDeniedError,
     RateLimitError,
+    RequestLimitExceededError,
 )
 
 KEY = "sk-audit-synthetic-0011223344556677"
@@ -181,6 +182,7 @@ def test_wrapper_close_preserves_caller_owned_transport(mode: str) -> None:
         "payload_too_large",
         "rate_limited",
         "credit_limit_exceeded",
+        "request_limit_exceeded",
         "internal_error",
         "upstream_error",
         "service_unavailable",
@@ -203,6 +205,7 @@ def test_error_classification_matches_reference_precedence(
     expected = {
         "rate_limited": RateLimitError,
         "credit_limit_exceeded": CreditLimitExceededError,
+        "request_limit_exceeded": RequestLimitExceededError,
     }.get(code or "", expected)
     error, waits = exercise(
         mode,

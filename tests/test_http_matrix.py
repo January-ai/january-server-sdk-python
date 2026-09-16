@@ -30,6 +30,7 @@ from januaryai import (
     PayloadTooLargeError,
     PermissionDeniedError,
     RateLimitError,
+    RequestLimitExceededError,
     models,
 )
 from januaryai._runtime import Contract
@@ -46,6 +47,7 @@ ERRORS = (
     (413, "payload_too_large", PayloadTooLargeError),
     (429, "rate_limited", RateLimitError),
     (429, "credit_limit_exceeded", CreditLimitExceededError),
+    (429, "request_limit_exceeded", RequestLimitExceededError),
     (500, "internal_error", InternalServerError),
     (501, "not_implemented", InternalServerError),
     (502, "upstream_error", InternalServerError),

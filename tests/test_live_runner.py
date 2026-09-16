@@ -12,7 +12,7 @@ import threading
 import zipfile
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from uuid import uuid4
@@ -120,10 +120,36 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 if hide_logs:
                     response["body"] = {"items": []}
             if op == "getFoodLogSummary":
-                count = len(state["logs"].get(user, {}))
-                response["body"]["totals"]["logs_count"] = count
-                for bucket in response["body"]["buckets"]:
-                    bucket["logs_count"] = count
+                # One day bucket per date in the requested range, counting only the logs
+                # eaten on that date, the way the API buckets them.
+                query = parse_qs(location.query)
+                start = date.fromisoformat(query["start_date"][0])
+                end = date.fromisoformat(query["end_date"][0])
+                eaten_dates = [log["eaten_at"][:10] for log in state["logs"].get(user, {}).values()]
+                buckets = []
+                day = start
+                while day <= end:
+                    count = eaten_dates.count(day.isoformat())
+                    buckets.append(
+                        {
+                            "start_date": day.isoformat(),
+                            "end_date": day.isoformat(),
+                            "logs_count": count,
+                            "days_with_logs": 1 if count else 0,
+                            "nutrients": {},
+                        }
+                    )
+                    day += timedelta(days=1)
+                response["body"].update(
+                    start_date=start.isoformat(),
+                    end_date=end.isoformat(),
+                    buckets=buckets,
+                    totals={
+                        "logs_count": sum(b["logs_count"] for b in buckets),
+                        "days_with_logs": sum(b["days_with_logs"] for b in buckets),
+                        "nutrients": {},
+                    },
+                )
             if op == "getFoodLog":
                 log_id = unquote(location.path.rsplit("/", 1)[1])
                 response["body"] = deepcopy(state["logs"][user][log_id])

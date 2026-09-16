@@ -37,6 +37,7 @@ handlers continue working:
 | `PayloadTooLargeError` | Request/image too large |
 | `RateLimitError` | Temporary rate limiting |
 | `CreditLimitExceededError` | Credit allowance exhausted; never retried |
+| `RequestLimitExceededError` | Monthly request allowance exhausted; never retried |
 | `InternalServerError` | Server/upstream error |
 
 Errors expose `status_code`, `code`, `request_id`, `docs_url`, and parsed
