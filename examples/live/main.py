@@ -563,6 +563,7 @@ async def workflow(
                 timezone="UTC",
                 group_by="day",
             ),
+            blocked="food_logs.create did not return a log" if created is None else None,
             validate=lambda r: require(
                 r.totals.logs_count >= 1 and len(r.buckets) >= 1, "summary_missing_created_log"
             ),

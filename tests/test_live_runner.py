@@ -294,6 +294,11 @@ def test_default_both_modes_all_21_local_http_and_live_ids(tmp_path, legacy_url)
         assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
         assert len(state["requests"]) == 44  # 21 + one client-token probe per mode.
+        summaries = [r for r in state["requests"] if r["operation"] == "getFoodLogSummary"]
+        assert len(summaries) == 2 and all(
+            r["query"]["timezone"] == ["UTC"] and r["query"]["group_by"] == ["day"]
+            for r in summaries
+        )
         assert len(state["revocations"]) == 2
         assert len(set(state["revocations"])) == 2
         assert all(
