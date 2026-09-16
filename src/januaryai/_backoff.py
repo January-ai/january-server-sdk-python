@@ -29,11 +29,12 @@ RETRYABLE_CODES: frozenset[str] = frozenset(
 )
 """Error codes the API documents as safe to retry with backoff."""
 
-NEVER_RETRY_CODES: frozenset[str] = frozenset({"credit_limit_exceeded"})
+NEVER_RETRY_CODES: frozenset[str] = frozenset({"credit_limit_exceeded", "request_limit_exceeded"})
 """Error codes that must not be retried even when their status class says otherwise.
 
-Credit exhaustion arrives as a 429 but carries no ``Retry-After``; the allowance returns at the
-start of the next calendar month, so retrying cannot succeed.
+Credit exhaustion and the monthly request allowance both arrive as a 429 without
+``Retry-After``; each reopens only at the start of the next calendar month, so retrying
+cannot succeed.
 """
 
 _PERMANENT_CODES: frozenset[str] = frozenset(

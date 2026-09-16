@@ -27,6 +27,7 @@ from .errors import (
     PayloadTooLargeError,
     PermissionDeniedError,
     RateLimitError,
+    RequestLimitExceededError,
 )
 from .food_portion import FoodPortion, FoodPortionError, FoodPortionErrorCode
 from .http import AsyncHttpClientTokenIssuer, HttpClientTokenIssuer
@@ -66,6 +67,7 @@ __all__ = [
     "PayloadTooLargeError",
     "PermissionDeniedError",
     "RateLimitError",
+    "RequestLimitExceededError",
     "ResponseMetadata",
     "__version__",
     "create_async_demo_token_issuer",

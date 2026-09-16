@@ -12,7 +12,7 @@ import threading
 import zipfile
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from uuid import uuid4
@@ -73,11 +73,15 @@ def service(fail=None, revoke_count=1, hide_logs=False):
             from urllib.parse import parse_qs, unquote, urlsplit
 
             location = urlsplit(self.path)
-            fixture = next(
-                f
-                for f in FIXTURES
-                if f["method"] == self.command
-                and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", f["path"]), location.path)
+            # A literal path (food-logs/summary) beats a templated one (food-logs/{id}).
+            fixture = min(
+                (
+                    f
+                    for f in FIXTURES
+                    if f["method"] == self.command
+                    and re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", f["path"]), location.path)
+                ),
+                key=lambda f: f["path"].count("{"),
             )
             op = fixture["operationId"]
             response = deepcopy(fixture["response"])
@@ -115,6 +119,48 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"] = {"items": list(state["logs"].get(user, {}).values())}
                 if hide_logs:
                     response["body"] = {"items": []}
+            if op == "getFoodLogSummary":
+                # One day bucket per date in the requested range, counting only the logs
+                # eaten on that date, the way the API buckets them.
+                query = parse_qs(location.query)
+                # The offline service models only UTC day buckets; make any other
+                # request fail loudly instead of being silently misrepresented.
+                assert query.get("group_by", ["day"]) == ["day"], query
+                assert query["timezone"] == ["UTC"], query
+                assert "week_start" not in query, query
+                start = date.fromisoformat(query["start_date"][0])
+                end = date.fromisoformat(query["end_date"][0])
+                eaten_dates = [log["eaten_at"][:10] for log in state["logs"].get(user, {}).values()]
+                buckets = []
+                day = start
+                while day <= end:
+                    count = eaten_dates.count(day.isoformat())
+                    buckets.append(
+                        {
+                            "start_date": day.isoformat(),
+                            "end_date": day.isoformat(),
+                            "logs_count": count,
+                            "days_with_logs": 1 if count else 0,
+                            "nutrients": {},
+                        }
+                    )
+                    day += timedelta(days=1)
+                # Echo the request the way the API does, and keep every derived
+                # field consistent with the synthetic (nutrient-free) totals.
+                response["body"].update(
+                    group_by="day",
+                    week_start=None,
+                    timezone=query["timezone"][0],
+                    start_date=start.isoformat(),
+                    end_date=end.isoformat(),
+                    buckets=buckets,
+                    totals={
+                        "logs_count": sum(b["logs_count"] for b in buckets),
+                        "days_with_logs": sum(b["days_with_logs"] for b in buckets),
+                        "nutrients": {},
+                    },
+                    average_per_logged_day={"nutrients": {}},
+                )
             if op == "getFoodLog":
                 log_id = unquote(location.path.rsplit("/", 1)[1])
                 response["body"] = deepcopy(state["logs"][user][log_id])
@@ -234,7 +280,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 40}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 42}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -244,16 +290,21 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_20_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_21_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 42  # 20 + one client-token probe per mode.
+        assert len(state["requests"]) == 44  # 21 + one client-token probe per mode.
+        summaries = [r for r in state["requests"] if r["operation"] == "getFoodLogSummary"]
+        assert len(summaries) == 2 and all(
+            r["query"]["timezone"] == ["UTC"] and r["query"]["group_by"] == ["day"]
+            for r in summaries
+        )
         assert len(state["revocations"]) == 2
         assert len(set(state["revocations"])) == 2
         assert all(
@@ -289,9 +340,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 40, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 76
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 78
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 

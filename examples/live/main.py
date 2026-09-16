@@ -42,6 +42,7 @@ OPERATIONS = (
     "food_analysis.correct",
     "food_logs.create",
     "food_logs.list",
+    "food_logs.get_summary",
     "food_logs.get",
     "food_logs.update",
     "food_logs.delete",
@@ -553,6 +554,19 @@ async def workflow(
                 timezone="UTC",
             ),
             validate=check_logs,
+        )
+        await step(
+            "food_logs.get_summary",
+            lambda: user.food_logs.get_summary(
+                start_date=date_range["start"],
+                end_date=date_range["end"],
+                timezone="UTC",
+                group_by="day",
+            ),
+            blocked="food_logs.create did not return a log" if created is None else None,
+            validate=lambda r: require(
+                r.totals.logs_count >= 1 and len(r.buckets) >= 1, "summary_missing_created_log"
+            ),
         )
         await step(
             "food_logs.get",

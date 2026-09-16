@@ -29,6 +29,7 @@ from januaryai import (
     PayloadTooLargeError,
     PermissionDeniedError,
     RateLimitError,
+    RequestLimitExceededError,
     models,
 )
 from januaryai._backoff import parse_retry_after, should_retry_response
@@ -95,6 +96,7 @@ def exercise(mode, responses, *, operation="getCredits", options=None, transport
         (413, "payload_too_large", PayloadTooLargeError, 0),
         (429, "rate_limited", RateLimitError, 2),
         (429, "credit_limit_exceeded", CreditLimitExceededError, 0),
+        (429, "request_limit_exceeded", RequestLimitExceededError, 0),
         (500, "internal_error", InternalServerError, 2),
         (502, "upstream_error", InternalServerError, 2),
         (503, "service_unavailable", InternalServerError, 2),
@@ -125,6 +127,7 @@ def test_code_aware_errors_and_default_retry_budget(mode, status, code, error_ty
     assert "private" not in str(error) and "sk-offline-test" not in error.message
     assert len(calls) == retries + 1 and len(sleeps) == retries
     assert not issubclass(CreditLimitExceededError, RateLimitError)
+    assert not issubclass(RequestLimitExceededError, RateLimitError)
 
 
 @pytest.mark.parametrize("mode", ["sync", "asyncio", "trio"])
@@ -188,6 +191,7 @@ def test_bad_retry_after(value):
 def test_http_date_retry_after_and_code_precedence():
     assert parse_retry_after("Wed, 01 Jan 2020 00:00:00 GMT") == 0
     assert not should_retry_response(503, "credit_limit_exceeded")
+    assert not should_retry_response(429, "request_limit_exceeded")
     assert not should_retry_response(503, "invalid_request")
 
 

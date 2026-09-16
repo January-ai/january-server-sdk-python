@@ -43,25 +43,21 @@ class AlternativeFood(APIModel):
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the producer sent a food with no name.")
     brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False)
-    servings: list[AlternativeServing] = Field(..., alias="servings", repr=False, description="Servings to read the nutrition against. Empty when the recommender returned none — the key itself is always present.")
+    servings: list[ServingSummary] = Field(..., alias="servings", repr=False, description="Servings to read the nutrition against. Empty when the recommender returned none — the key itself is always present.")
 
 class AlternativeFoodInput(TypedDict, total=False):
     id: Required[str | None]
     name: Required[str | None]
     brand_name: Required[str | None]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
-    servings: Required[Sequence[AlternativeServing | AlternativeServingInput]]
+    servings: Required[Sequence[ServingSummary | ServingSummaryInput]]
 
-class AlternativeServing(APIModel):
-    "AlternativeServing: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Null only when the producer sent a serving with no id.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="How much of `unit` this serving is; null when the producer reported none.")
-    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
+class AnalysisReasoning(APIModel):
+    "AnalysisReasoning: typed API data. Unknown response fields are preserved."
+    effort: str = Field(..., alias="effort", repr=False, description="`none` uses the standard analyzer; `xhigh` uses the reasoning-based analyzer.")
 
-class AlternativeServingInput(TypedDict, total=False):
-    id: Required[str | None]
-    quantity: Required[float | None]
-    unit: Required[str | None]
+class AnalysisReasoningInput(TypedDict, total=False):
+    effort: Required[Literal["none", "xhigh"]]
 
 class AutocompleteFoodsResponse(APIModel):
     "AutocompleteFoodsResponse: typed API data. Unknown response fields are preserved."
@@ -169,33 +165,22 @@ class DetectedFood(APIModel):
     id: str | None = Field(..., alias="id", repr=False, description="Catalog food id, or null when the producer matched none.")
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the producer sent a food with no name.")
     brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
-    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False)
-    servings: list[DetectedServing] = Field(..., alias="servings", repr=False, description="Never empty: every detection producer guarantees at least one serving.")
+    quantity: float | None = Field(..., alias="quantity", repr=False, description="Number of catalog servings consumed, ready to use as food-log quantity. For 40 g from a 100 g serving this is 0.4. Null when the producer supplied no usable portion.")
+    serving: ServingSummary = Field(..., alias="serving", repr=False, description="Selected catalog serving definition; its quantity is the size of one serving, not the amount eaten.")
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrition for the consumed portion, already scaled by quantity.")
 
 class DetectedFoodInput(TypedDict, total=False):
     id: Required[str | None]
     name: Required[str | None]
     brand_name: Required[str | None]
-    nutrients: Required[NutritionFacts | NutritionFactsInput]
-    servings: Required[Sequence[DetectedServing | DetectedServingInput]]
-
-class DetectedServing(APIModel):
-    "DetectedServing: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Null only when the producer sent a serving with no id.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="How much of `unit` this serving is; null when the producer reported none.")
-    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
-    selected_quantity: float | None = Field(..., alias="selected_quantity", repr=False, description="Quantity parsed from the text ('2 cups' → 2); null on image analyses. Advisory — corrections reads the serving's own quantity.")
-
-class DetectedServingInput(TypedDict, total=False):
-    id: Required[str | None]
     quantity: Required[float | None]
-    unit: Required[str | None]
-    selected_quantity: Required[float | None]
+    serving: Required[ServingSummary | ServingSummaryInput]
+    nutrients: Required[NutritionFacts | NutritionFactsInput]
 
 class ErrorResponse(APIModel):
     "ErrorResponse: typed API data. Unknown response fields are preserved."
     message: str = Field(..., alias="message", repr=False, description="A developer-facing explanation of what went wrong and how to fix it.")
-    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Two more the status code alone gets wrong: `credit_limit_exceeded` is a 429 that **must never be retried** — the allowance returns next calendar month, so a client that backs off on every 429 will spin until then; and `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
+    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
 
 class ErrorResponseInput(TypedDict, total=False):
     message: Required[str]
@@ -233,6 +218,60 @@ class FoodLogInputFoodInput(TypedDict, total=False):
     food_id: Required[FoodId]
     serving_id: Required[ServingId]
     quantity: Required[float]
+
+class FoodLogSummary(APIModel):
+    "FoodLogSummary: typed API data. Unknown response fields are preserved."
+    group_by: str = Field(..., alias="group_by", repr=False, description="The bucket size used, echoing the request.")
+    week_start: str | None = Field(..., alias="week_start", repr=False, description="The weekday week buckets begin on. Always present; `null` when `group_by=day`, where it does not apply.")
+    timezone: str = Field(..., alias="timezone", repr=False, description="The IANA timezone the buckets were cut in — the canonical spelling of what was requested.")
+    start_date: date = Field(..., alias="start_date", repr=False, description="First local calendar date of the summarized range, echoing the request.")
+    end_date: date = Field(..., alias="end_date", repr=False, description="Last local calendar date of the summarized range, inclusive.")
+    buckets: list[FoodLogSummaryBucket] = Field(..., alias="buckets", repr=False, description="The buckets tiling the range, in chronological order and covering it end to end — a day or week with no logs is returned with zero counts rather than skipped.")
+    totals: FoodLogSummaryTotals = Field(..., alias="totals", repr=False)
+    average_per_logged_day: FoodLogSummaryAverage = Field(..., alias="average_per_logged_day", repr=False)
+
+class FoodLogSummaryInput(TypedDict, total=False):
+    group_by: Required[Literal["day", "week"]]
+    week_start: Required[Literal["monday", "sunday"] | None]
+    timezone: Required[str]
+    start_date: Required[str | date | datetime]
+    end_date: Required[str | date | datetime]
+    buckets: Required[Sequence[FoodLogSummaryBucket | FoodLogSummaryBucketInput]]
+    totals: Required[FoodLogSummaryTotals | FoodLogSummaryTotalsInput]
+    average_per_logged_day: Required[FoodLogSummaryAverage | FoodLogSummaryAverageInput]
+
+class FoodLogSummaryAverage(APIModel):
+    "FoodLogSummaryAverage: typed API data. Unknown response fields are preserved."
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Totals divided by `totals.days_with_logs` — an average over days that were logged, not over days in the range. `{}` when none were.")
+
+class FoodLogSummaryAverageInput(TypedDict, total=False):
+    nutrients: Required[NutritionFacts | NutritionFactsInput]
+
+class FoodLogSummaryBucket(APIModel):
+    "FoodLogSummaryBucket: typed API data. Unknown response fields are preserved."
+    start_date: date = Field(..., alias="start_date", repr=False, description="First local calendar date this bucket covers. Clipped to the requested range, so the first week bucket may be partial.")
+    end_date: date = Field(..., alias="end_date", repr=False, description="Last local calendar date this bucket covers, inclusive. Equal to start_date when grouping by day.")
+    logs_count: int = Field(..., alias="logs_count", repr=False, description="How many logs fall in this bucket.")
+    days_with_logs: int = Field(..., alias="days_with_logs", repr=False, description="How many distinct local calendar dates in this bucket carry at least one log.")
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrients summed over this bucket. A key is absent when no value was available; `{}` means nothing could be totalled — read `logs_count` to tell an empty bucket from one whose logs were unresolvable.")
+
+class FoodLogSummaryBucketInput(TypedDict, total=False):
+    start_date: Required[str | date | datetime]
+    end_date: Required[str | date | datetime]
+    logs_count: Required[int]
+    days_with_logs: Required[int]
+    nutrients: Required[NutritionFacts | NutritionFactsInput]
+
+class FoodLogSummaryTotals(APIModel):
+    "FoodLogSummaryTotals: typed API data. Unknown response fields are preserved."
+    logs_count: int = Field(..., alias="logs_count", repr=False, description="Logs in the whole range.")
+    days_with_logs: int = Field(..., alias="days_with_logs", repr=False, description="Distinct local calendar dates in the range that carry at least one log.")
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrients summed over the whole range, with the same sparseness as a bucket’s.")
+
+class FoodLogSummaryTotalsInput(TypedDict, total=False):
+    logs_count: Required[int]
+    days_with_logs: Required[int]
+    nutrients: Required[NutritionFacts | NutritionFactsInput]
 
 class FoodScan(APIModel):
     "FoodScan: typed API data. Unknown response fields are preserved."
@@ -524,9 +563,11 @@ class RevokeClientTokensBodyInput(TypedDict, total=False):
 class ScanFoodPhotoBody(APIModel):
     "ScanFoodPhotoBody: typed API data. Unknown response fields are preserved."
     image: str = Field(..., alias="image", repr=False, description="The food photo — the food itself or a packaged product's label — as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Formats: JPG, PNG, WEBP, and non-animated GIF. Around 1,024 px on the shorter side is enough for reliable results (a recommendation, not a validation rule). A URL must be publicly fetchable server-side — hosts that block hotlinking or require a login cannot be read — and has no enforced size cap, though very large files slow the analysis and can time out. Base64 must be a complete data URI and fit the 5 MB request-body cap, so keep raw images under ~3.5 MB before encoding (base64 inflates by ~33%). Prefer the URL when the image is already hosted.")
+    reasoning: AnalysisReasoning | None = Field(default=None, alias="reasoning", repr=False, description="Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.")
 
 class ScanFoodPhotoBodyInput(TypedDict, total=False):
     image: Required[str]
+    reasoning: AnalysisReasoning | AnalysisReasoningInput
 
 class SearchFoodsByNaturalLanguageBody(APIModel):
     "SearchFoodsByNaturalLanguageBody: typed API data. Unknown response fields are preserved."
@@ -579,6 +620,17 @@ class ServingOptionInput(TypedDict, total=False):
     weight_grams: Required[float | None]
     is_primary: Required[bool | None]
 
+class ServingSummary(APIModel):
+    "ServingSummary: typed API data. Unknown response fields are preserved."
+    id: str | None = Field(..., alias="id", repr=False, description="Null only when the producer sent a serving with no id.")
+    quantity: float | None = Field(..., alias="quantity", repr=False, description="How much of `unit` this serving is; null when the producer reported none.")
+    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
+
+class ServingSummaryInput(TypedDict, total=False):
+    id: Required[str | None]
+    quantity: Required[float | None]
+    unit: Required[str | None]
+
 class SuggestFoodAlternativesBody(APIModel):
     "SuggestFoodAlternativesBody: typed API data. Unknown response fields are preserved."
     diet_restrictions: list[DietRestriction] | None = Field(default=None, alias="diet_restrictions", repr=False, description="Allergens/ingredients to avoid. Omit it (or send []) if none apply.")
@@ -617,7 +669,7 @@ class WeightInput(TypedDict, total=False):
 
 # Resolve forward references after every schema has been declared.
 AlternativeFood.model_rebuild()
-AlternativeServing.model_rebuild()
+AnalysisReasoning.model_rebuild()
 AutocompleteFoodsResponse.model_rebuild()
 CgmReading.model_rebuild()
 ClientToken.model_rebuild()
@@ -628,11 +680,14 @@ CreateClientTokenBody.model_rebuild()
 CreateFoodLogBody.model_rebuild()
 CreditBalance.model_rebuild()
 DetectedFood.model_rebuild()
-DetectedServing.model_rebuild()
 ErrorResponse.model_rebuild()
 FoodDetection.model_rebuild()
 FoodLog.model_rebuild()
 FoodLogInputFood.model_rebuild()
+FoodLogSummary.model_rebuild()
+FoodLogSummaryAverage.model_rebuild()
+FoodLogSummaryBucket.model_rebuild()
+FoodLogSummaryTotals.model_rebuild()
 FoodScan.model_rebuild()
 FoodSearchItem.model_rebuild()
 FoodSearchResults.model_rebuild()
@@ -658,6 +713,7 @@ SearchRestaurantMenuItemsResponse.model_rebuild()
 SearchRestaurantsResponse.model_rebuild()
 ServingDetails.model_rebuild()
 ServingOption.model_rebuild()
+ServingSummary.model_rebuild()
 SuggestFoodAlternativesBody.model_rebuild()
 SuggestFoodAlternativesResponse.model_rebuild()
 UpdateFoodLogBody.model_rebuild()

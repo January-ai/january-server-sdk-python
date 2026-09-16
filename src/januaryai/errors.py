@@ -88,15 +88,20 @@ class CreditLimitExceededError(JanuaryAPIError):
     """Credits are exhausted. Never treated as a retryable rate limit."""
 
 
+class RequestLimitExceededError(JanuaryAPIError):
+    """The monthly request allowance is exhausted. Never treated as a retryable rate limit."""
+
+
 class InternalServerError(JanuaryAPIError):
     """A server or upstream failure (HTTP 5xx)."""
 
 
 def api_error_type(status_code: int, code: str | None) -> type[JanuaryAPIError]:
-    """Match the reference: only rate/credit codes override the HTTP status."""
+    """Match the reference: only the rate and monthly-allowance codes override the HTTP status."""
     by_code: dict[str, type[JanuaryAPIError]] = {
         "rate_limited": RateLimitError,
         "credit_limit_exceeded": CreditLimitExceededError,
+        "request_limit_exceeded": RequestLimitExceededError,
     }
     by_status: dict[int, type[JanuaryAPIError]] = {
         400: BadRequestError,
