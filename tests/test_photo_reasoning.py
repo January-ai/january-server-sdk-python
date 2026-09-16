@@ -1,8 +1,8 @@
 """The optional analysis `reasoning` input reaches the wire in both client flavours."""
 
 import asyncio
-from collections.abc import Callable
 import json
+from collections.abc import Callable
 from copy import deepcopy
 
 import httpx
