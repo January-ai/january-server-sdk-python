@@ -145,7 +145,12 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                         }
                     )
                     day += timedelta(days=1)
+                # Echo the request the way the API does, and keep every derived
+                # field consistent with the synthetic (nutrient-free) totals.
                 response["body"].update(
+                    group_by="day",
+                    week_start=None,
+                    timezone=query["timezone"][0],
                     start_date=start.isoformat(),
                     end_date=end.isoformat(),
                     buckets=buckets,
@@ -154,6 +159,7 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                         "days_with_logs": sum(b["days_with_logs"] for b in buckets),
                         "nutrients": {},
                     },
+                    average_per_logged_day={"nutrients": {}},
                 )
             if op == "getFoodLog":
                 log_id = unquote(location.path.rsplit("/", 1)[1])
