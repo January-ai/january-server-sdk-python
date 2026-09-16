@@ -19,14 +19,18 @@ with January(max_retries=0) as client:
         analysis=analysis,
         instruction="There was half as much rice",
     )
+    # A detection without a usable portion has quantity None; leave it out
+    # (or ask the user for a serving) rather than logging an invented one.
     selections = [
         {
             "food_id": item.food.id,
             "serving_id": item.food.serving.id,
-            "quantity": item.food.quantity or 1,
+            "quantity": item.food.quantity,
         }
         for item in corrected.detections
-        if item.food.id is not None and item.food.serving.id is not None
+        if item.food.id is not None
+        and item.food.serving.id is not None
+        and item.food.quantity is not None
     ]
     if selections:
         log = user.food_logs.create(foods=selections, name="Lunch")
