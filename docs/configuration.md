@@ -52,9 +52,13 @@ success response, not a server rejection. Catch `JanuaryError` to handle both,
 including closed-client and redirect failures. Supplied HTTPX clients remain
 usable after the SDK wrapper is closed, until their owner closes the transport.
 
-Status classification follows HTTP status except for `rate_limited` and
-`credit_limit_exceeded`, whose codes distinguish rate limits from exhausted credits.
-Retry decisions remain code-aware independently of the exception class.
+Status classification follows HTTP status except for three 429 codes:
+`rate_limited` (a temporary limit, `RateLimitError`), `credit_limit_exceeded`
+(`CreditLimitExceededError`), and `request_limit_exceeded`
+(`RequestLimitExceededError`). The last two are monthly allowances that reopen
+at the start of the next calendar month, so neither is a `RateLimitError` and
+neither is retried. Retry decisions remain code-aware independently of the
+exception class.
 
 `message` contains at most 200 characters plus a truncation marker. `body` retains
 redacted JSON or diagnostic text, including gateway HTML/plain-text failures;
@@ -97,6 +101,7 @@ also bounds the total request/retry duration. Cancellation interrupts retry wait
 | HTTP 403 | Check key permissions; token minting also requires **Enable client tokens**. |
 | HTTP 429, `rate_limited` | Respect `retry_after` if retry attempts are exhausted. |
 | HTTP 429, `credit_limit_exceeded` | Check [Billing](https://dashboard.january.ai/billing), not a sleep-and-retry loop. |
+| HTTP 429, `request_limit_exceeded` | The monthly request allowance is used up; it reopens next month. Do not retry. |
 | Timeout/connection failure | Check connectivity. An interrupted request may already have reached the service. |
 
 Share safe status/code/request-ID fields with
