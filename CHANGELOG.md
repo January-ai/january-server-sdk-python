@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-22
+
+- Add water logs: `water_logs.create`, `water_logs.list` (daily totals in the
+  requested unit) and `water_logs.delete` (idempotent).
+- Add weight logs: `weight_logs.create` and `weight_logs.list` (latest weight per day).
+- Add the `water_logs:read`, `water_logs:write`, `weight_logs:read` and
+  `weight_logs:write` client-token scopes.
+- Water and weight creation are never replayed after an ambiguous failure, like
+  food-log creation and token minting.
+- `food_logs.update` rejects an empty update before sending it, and only sends the
+  fields you set.
+- `food_analysis.correct` sends a returned `FoodScan` back as the correction input
+  the API now documents (`CorrectionAnalysis`); a serving weight is optional there.
+- Logged foods carry the same `ServingSummary` as analysis results, including
+  `weight_grams`.
+
 ## 0.1.0 - 2026-09-04
 
 Initial public release.

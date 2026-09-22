@@ -24,7 +24,12 @@ from anyio.to_thread import run_sync
 from pydantic import BaseModel, ConfigDict, PrivateAttr, TypeAdapter, ValidationError
 
 from ._backoff import classify_transport_error, compute_delay, should_retry_response
-from ._constants import DEFAULT_MAX_RETRIES, MAX_HONORED_RETRY_AFTER, MAX_TOTAL_RETRY_AFTER_WAIT
+from ._constants import (
+    DEFAULT_MAX_RETRIES,
+    MAX_HONORED_RETRY_AFTER,
+    MAX_TOTAL_RETRY_AFTER_WAIT,
+    NEVER_REPLAY_AMBIGUOUS,
+)
 from ._images import prepare_image
 from ._version import __version__
 from .errors import (
@@ -447,6 +452,10 @@ class HTTPBase:
                 for p in op["fields"]
                 if not isinstance(values.get(p["publicName"], UNSET), UnsetType)
             }
+            # A partial update must carry at least one field; the API rejects an
+            # empty patch, so stop before sending one.
+            if len(body) < self._contract.resolve(op["bodySchema"]).get("minProperties", 0):
+                raise JanuaryValidationError("Provide at least one field to update")
             # Only returned detection models may preserve additive response fields.
             # Raw dictionaries, other requests, and known fields stay schema-validated.
             request["json"] = self._contract.encode(
@@ -615,10 +624,13 @@ class HTTPBase:
         operation = self._contract.data["operations"][operation_id]
         if operation.get("retryNever", False):
             return None
+        replay_ambiguous = (
+            operation.get("retryAmbiguous", False) and operation_id not in NEVER_REPLAY_AMBIGUOUS
+        )
         if isinstance(error, JanuaryAPIError):
             if not should_retry_response(error.status_code, error.code):
                 return None
-            if error.status_code != 429 and not operation.get("retryAmbiguous", False):
+            if error.status_code != 429 and not replay_ambiguous:
                 return None
             delay = error.retry_after
             if delay is not None:
@@ -643,9 +655,7 @@ class HTTPBase:
                 if isinstance(error.cause, Exception)
                 else "fatal"
             )
-            if kind != "pre_send" and not (
-                kind == "ambiguous" and operation.get("retryAmbiguous", False)
-            ):
+            if kind != "pre_send" and not (kind == "ambiguous" and replay_ambiguous):
                 return None
         return compute_delay(attempt, rng=self._rng)
 

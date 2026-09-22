@@ -46,6 +46,11 @@ OPERATIONS = (
     "food_logs.get",
     "food_logs.update",
     "food_logs.delete",
+    "water_logs.create",
+    "water_logs.list",
+    "water_logs.delete",
+    "weight_logs.create",
+    "weight_logs.list",
     "glucose.predict",
     "create_client_token",
     "revoke_client_tokens",
@@ -361,6 +366,7 @@ async def workflow(
     started = datetime.now(UTC)
     date_range = {"start": started.date().isoformat(), "end": started.date().isoformat()}
     owned_logs: set[str] = set()
+    owned_water_logs: set[str] = set()
     create_attempted = False
     create_acknowledged = False
     mint_attempted = False
@@ -583,6 +589,55 @@ async def workflow(
                 r.id == require_value(created).id, "updated_log_id_mismatch"
             ),
         )
+
+        async def create_water_log() -> Any:
+            entry = await invoke(
+                user.water_logs.create,
+                amount={"value": 250, "unit": "ml"},
+                consumed_at=started,
+            )
+            if isinstance(entry.id, str) and entry.id:
+                owned_water_logs.add(entry.id)
+            require(bool(entry.id), "missing_created_water_log_id")
+            require(
+                entry.amount.unit == "ml" and entry.amount.value == 250, "water_amount_mismatch"
+            )
+            return entry
+
+        water = await step("water_logs.create", create_water_log)
+        await step(
+            "water_logs.list",
+            lambda: user.water_logs.list(
+                start_date=date_range["start"],
+                end_date=date_range["end"],
+                timezone="UTC",
+                unit="ml",
+            ),
+            blocked="water_logs.create did not return a log" if water is None else None,
+            validate=lambda r: require(
+                any(item.total.value >= 250 for item in r.items), "water_total_missing_created_log"
+            ),
+        )
+        await step(
+            "weight_logs.create",
+            lambda: user.weight_logs.create(
+                weight={"value": 65, "unit": "kg"}, measured_at=started
+            ),
+            validate=lambda r: require(
+                r.weight.unit == "kg" and r.weight.value == 65, "weight_mismatch"
+            ),
+        )
+        await step(
+            "weight_logs.list",
+            lambda: user.weight_logs.list(
+                start_date=date_range["start"],
+                end_date=date_range["end"],
+                timezone="UTC",
+            ),
+            validate=lambda r: require(
+                any(item.weight.unit == "kg" for item in r.items), "weight_missing_created_log"
+            ),
+        )
         await step(
             "glucose.predict",
             lambda: user.glucose.predict(
@@ -675,6 +730,25 @@ async def workflow(
                 )
                 if deleted is not None:
                     owned_logs.discard(log_id)
+            water_ids = sorted(owned_water_logs)
+            if not water_ids:
+                await step(
+                    "water_logs.delete",
+                    lambda: None,
+                    blocked="no run-owned water log ID available",
+                )
+            for index, water_id in enumerate(water_ids):
+                deleted = await step(
+                    "water_logs.delete" if index == 0 else "cleanup.water_logs.delete",
+                    lambda water_id=water_id: user.water_logs.delete(log_id=water_id),
+                    kind="operation" if index == 0 else "cleanup",
+                    cleanup=True,
+                    validate=lambda r: require(
+                        r.status_code == 204, "water_log_delete_not_confirmed"
+                    ),
+                )
+                if deleted is not None:
+                    owned_water_logs.discard(water_id)
         finally:
             try:
                 await step(

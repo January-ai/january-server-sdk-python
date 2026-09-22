@@ -81,8 +81,8 @@ original typed error with `retry_after` so the application can schedule work.
 Ordinary jittered backoff does not count toward that server-requested allowance;
 all waits still count toward the overall request timeout.
 
-A token mint or food-log creation is never replayed after an ambiguous network
-failure or 5xx, which could duplicate the write. Failures known to occur before
+A token mint or a food, water or weight log creation is never replayed after an
+ambiguous network failure or 5xx, which could duplicate the write. Failures known to occur before
 sending, or a 429 rejection, may retry. Revocation always makes one request.
 Retried reads/analyses may consume extra credits if the previous attempt
 succeeded but its response was lost.

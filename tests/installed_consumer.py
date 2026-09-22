@@ -174,7 +174,7 @@ def main():
                     assert_request(service["requests"][-1], fixture)
 
         asyncio.run(run())
-        assert len(service["requests"]) == 42
+        assert len(service["requests"]) == 52
         from PIL import Image
 
         fixtures = {item["operationId"]: item for item in FIXTURES["operations"]}
@@ -192,14 +192,14 @@ def main():
             user = client.for_user("installed-photo-test")
             analysis = user.food_analysis.analyze_photo(image=photo.getvalue())
             assert service["requests"][-1]["body"]["image"].startswith("data:image/jpeg;base64,")
-            user.food_analysis.correct(analysis=analysis, instruction="smaller portion")
+            user.food_analysis.correct(analysis=analysis, instruction="smaller portion")  # pyright: ignore[reportArgumentType] -- FoodScan round-trips; generated hint pending
             assert service["requests"][-1]["body"]["analysis"]["detections"][0]["future_field"] == {
                 "value": 7
             }
             assert isinstance(client.get_credits(), models.CreditBalance)
-        assert len(service["requests"]) == 46 and not service["responses"]
+        assert len(service["requests"]) == 56 and not service["responses"]
     print(
-        "Installed package: FoodPortion, 21 sync + 21 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
+        "Installed package: FoodPortion, 26 sync + 26 async operations, photo preparation, correction round trip and retry recovery passed over loopback HTTP"
     )
 
 

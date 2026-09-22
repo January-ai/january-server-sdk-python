@@ -157,7 +157,9 @@ def test_each_endpoint_retry_safety_over_http(mode, fixture, status, code):
         ]
         never = fixture["operationId"] == "revokeClientTokens"
         ambiguous_write = (
-            fixture["operationId"] in {"createClientToken", "createFoodLog"} and status == 503
+            fixture["operationId"]
+            in {"createClientToken", "createFoodLog", "createWaterLog", "createWeightLog"}
+            and status == 503
         )
         if never or ambiguous_write:
             with pytest.raises(JanuaryAPIError):
@@ -185,7 +187,7 @@ def test_invalid_identity_stops_before_http(client_type):
         pytest.param(fixture, failure, id=f"{fixture['operationId']}-{failure}")
         for fixture in OPERATIONS
         for failure in ("unexpected_status", "invalid_json", "invalid_shape")
-        if fixture["operationId"] not in {"revokeClientTokens", "deleteFoodLog"}
+        if fixture["operationId"] not in {"revokeClientTokens", "deleteFoodLog", "deleteWaterLog"}
         or failure == "unexpected_status"
     ],
 )

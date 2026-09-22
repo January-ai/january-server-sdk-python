@@ -3,6 +3,7 @@
 import runpy
 import sys
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -84,3 +85,23 @@ if __name__ == "__main__":
     sys.argv = [str(source)]
     with loopback_http(origin):
         runpy.run_path(str(source), run_name="__main__")
+
+
+def canonical_timestamps(value):
+    """Rewrite zoned ISO-8601 timestamps to one spelling so fixture and model dumps compare.
+
+    The API answers with millisecond precision ("15.123Z") while pydantic prints
+    microseconds ("15.123000Z"); both describe the same instant.
+    """
+    if isinstance(value, dict):
+        return {key: canonical_timestamps(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [canonical_timestamps(item) for item in value]
+    if isinstance(value, str) and "T" in value and len(value) >= 20:
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return value
+        if parsed.tzinfo is not None:
+            return parsed.isoformat()
+    return value

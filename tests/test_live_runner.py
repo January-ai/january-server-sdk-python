@@ -62,6 +62,8 @@ def service(fail=None, revoke_count=1, hide_logs=False):
     state = {
         "requests": [],
         "logs": {},
+        "water": {},
+        "weights": {},
         "tokens": {},
         "users": set(),
         "fail": fail or {},
@@ -171,6 +173,47 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"] = deepcopy(state["logs"][user][log_id])
             if op == "deleteFoodLog" and op not in state["fail"]:
                 state["logs"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
+            if op == "createWaterLog":
+                assert body is not None
+                entry = response["body"]
+                entry.update(id=str(uuid4()), amount=body["amount"])
+                state["water"].setdefault(user, {})[entry["id"]] = deepcopy(entry)
+            if op == "listWaterLogs":
+                query = parse_qs(location.query)
+                unit = query["unit"][0]
+                total = sum(
+                    entry["amount"]["value"]
+                    * (29.5735 if entry["amount"]["unit"] == "fl_oz" else 1)
+                    for entry in state["water"].get(user, {}).values()
+                )
+                if unit == "fl_oz":
+                    total = total / 29.5735
+                response["body"] = {
+                    "items": (
+                        [
+                            {
+                                "date": query["start_date"][0],
+                                "total": {"value": round(total, 1), "unit": unit},
+                            }
+                        ]
+                        if total
+                        else []
+                    )
+                }
+            if op == "deleteWaterLog" and op not in state["fail"]:
+                state["water"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
+            if op == "createWeightLog":
+                assert body is not None
+                response["body"].update(weight=body["weight"])
+                state["weights"].setdefault(user, []).append(deepcopy(response["body"]))
+            if op == "listWeightLogs":
+                query = parse_qs(location.query)
+                latest = state["weights"].get(user, [])
+                response["body"] = {
+                    "items": [{"date": query["start_date"][0], "weight": latest[-1]["weight"]}]
+                    if latest
+                    else []
+                }
             if op == "createClientToken":
                 assert body is not None
                 token = "ct-offline-" + str(uuid4())
@@ -280,7 +323,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 42}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 52}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -290,16 +333,19 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_21_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_26_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 52, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 44  # 21 + one client-token probe per mode.
+        assert len(state["requests"]) == 54  # 26 + one client-token probe per mode.
+        water = [r for r in state["requests"] if r["operation"] == "listWaterLogs"]
+        assert len(water) == 2 and all(r["query"]["unit"] == ["ml"] for r in water)
+        assert not any(state["water"].values())
         summaries = [r for r in state["requests"] if r["operation"] == "getFoodLogSummary"]
         assert len(summaries) == 2 and all(
             r["query"]["timezone"] == ["UTC"] and r["query"]["group_by"] == ["day"]
@@ -340,9 +386,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 52, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 78
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 88
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 

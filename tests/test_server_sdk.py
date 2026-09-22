@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
+from example_harness import canonical_timestamps
 from installed_consumer import FIXTURES, arguments, assert_request, local_service, method
 
 from januaryai import (
@@ -49,14 +50,13 @@ def test_all_operations(fixture, async_mode):
                 result = method(client, fixture)(**arguments(fixture))
         assert len(service["requests"]) == 1
         assert_request(service["requests"][0], fixture)
-        if fixture["operationId"] == "deleteFoodLog":
+        if fixture["response"]["status"] == 204:
             assert isinstance(result, ResponseMetadata)
             assert result.status_code == 204
         else:
-            assert (
+            assert canonical_timestamps(
                 result.model_dump(by_alias=True, exclude_unset=True, mode="json")
-                == fixture["response"]["body"]
-            )
+            ) == canonical_timestamps(fixture["response"]["body"])
             assert result.response.request_id == fixture["response"]["headers"]["x-request-id"]
 
 
@@ -414,7 +414,7 @@ def test_manifest_matches_public_methods():
         Path(__file__).parents[1].joinpath("sdk-surface.json").read_text(encoding="utf-8")
     )
     assert manifest["language"] == "python"
-    assert len(manifest["operations"]) == 21
+    assert len(manifest["operations"]) == 26
     for client_type in [January, AsyncJanuary]:
         client = client_type(secret_key="sk-local-fixture")
         for op in manifest["operations"]:

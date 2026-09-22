@@ -153,7 +153,7 @@ precedence. The example disables retries to keep it to one request.
 
 ## Common tasks
 
-### All 21 operations at a glance
+### All 26 operations at a glance
 
 The table uses an open `client` and a `user = client.for_user(...)` view.
 Calls show the main arguments; replace `...` with your application's values.
@@ -178,21 +178,27 @@ All arguments are keyword-only. Async clients expose the same methods with `awai
 | `user.food_logs.get_summary(start_date=..., end_date=..., timezone=...)` | Sum nutrients per day or week over a date range | `FoodLogSummary` |
 | `user.food_logs.update(log_id=..., name=...)` | Update a food log's supplied fields | `FoodLog` |
 | `user.food_logs.delete(log_id=...)` | Delete a food log | `ResponseMetadata` |
+| `user.water_logs.create(amount=...)` | Record water for a user | `WaterLog` |
+| `user.water_logs.list(start_date=..., end_date=..., timezone=..., unit=...)` | Total water per day over a date range | `ListWaterLogsResponse` |
+| `user.water_logs.delete(log_id=...)` | Delete a water log | `ResponseMetadata` |
+| `user.weight_logs.create(weight=...)` | Record a weight measurement for a user | `WeightLog` |
+| `user.weight_logs.list(start_date=..., end_date=..., timezone=...)` | Latest weight per day over a date range | `ListWeightLogsResponse` |
 | `user.glucose.predict(user_profile=..., timezone=..., foods=..., start_time=...)` | Predict a meal's glucose response | `GlucosePrediction` |
 | `client.get_credits()` | Read the account's credit balance | `CreditBalance` |
 | `client.create_client_token(end_user_id=..., scopes=...)` | Create a short-lived token for an end user | `ClientToken` |
 | `client.revoke_client_tokens(end_user_id=...)` | Revoke an end user's client tokens | `ClientTokenRevocationResult` |
 
-The 17 resource operations also exist directly on `client`. A user view binds
-identity for food-log operations; account-scoped reads do not send user headers.
+The 23 resource operations also exist directly on `client`. A user view binds
+identity for food, water and weight log operations; account-scoped reads do not
+send user headers.
 The last three operations are server-only and are not exposed by a user view.
 Your editor shows optional arguments and typed response fields through autocomplete.
 
 ### End users and user views
 
 An end-user ID is your application's stable identifier for the person the
-request belongs to. Food logs need that identity; it keeps one user's diary
-separate from another's.
+request belongs to. Food, water and weight logs need that identity; it keeps
+one user's diary separate from another's.
 
 Reuse one client and call `client.for_user(user_id, end_user_timezone="UTC")`
 when handling a user's request. The returned view is immutable: its bound
@@ -262,6 +268,36 @@ The utility also works with async results. See the
 [serving-selection recipe](docs/recipes.md#search-choose-a-serving-calculate-locally-then-log)
 and [runnable portion example](examples/portions/main.py).
 
+### Water and weight logs
+
+Water and weight logs use the same user view as food logs. Water amounts are
+`fl_oz` or `ml`; weights are `lb` or `kg`. Both are stored in the unit you send.
+
+```python
+entry = user.water_logs.create(amount={"value": 250, "unit": "ml"})
+totals = user.water_logs.list(
+    start_date="2026-09-01", end_date="2026-09-07", timezone="America/New_York", unit="ml"
+)
+user.water_logs.delete(log_id=entry.id)
+
+user.weight_logs.create(weight={"value": 72.5, "unit": "kg"})
+weights = user.weight_logs.list(
+    start_date="2026-09-01", end_date="2026-09-07", timezone="America/New_York"
+)
+```
+
+`water_logs.list` returns one total per local day that has water logged, in the
+unit you ask for. `weight_logs.list` returns the latest measurement per day.
+Days with nothing logged are absent, and each list holds at most 100 days.
+Pass `consumed_at=` or `measured_at=` with a timezone-aware value to backdate an
+entry; omitted, the server uses now.
+
+A user's water is capped at 24 litres per day: a log that would exceed it raises
+`BadRequestError` with code `daily_water_limit_exceeded`. Deleting a water log is
+idempotent, so an unknown ID also returns `204`. Weight logs cannot be deleted.
+Like food-log creation, water and weight creation are never replayed after an
+ambiguous failure.
+
 ## Server-only operations
 
 `client.get_credits()`, `client.create_client_token(...)` and
@@ -271,7 +307,9 @@ For client-token minting, first open
 [Client tokens](https://dashboard.january.ai/dashboard/client-tokens) and choose
 **Enable client tokens** for your partner account. Mint on your backend with the
 authenticated user's ID; supply the least-privilege scopes it needs, such as
-`scopes=["foods:read"]`, and optionally `ttl_seconds=1800`. Return the token only
+`scopes=["foods:read"]` (water and weight logs use `water_logs:read`,
+`water_logs:write`, `weight_logs:read` and `weight_logs:write`), and optionally
+`ttl_seconds=1800`. Return the token only
 to that authenticated user, never to logs.
 
 Revoke separately when intentionally invalidating that user's tokens—not
