@@ -112,6 +112,26 @@ def test_create_water_log_without_time_omits_consumed_at(mode: str) -> None:
 
 
 @pytest.mark.parametrize("mode", MODES)
+def test_water_logs_accept_cups(mode: str) -> None:
+    captured, handler = recorder(201, BY_ID["createWaterLog"]["response"]["body"])
+    exercise(mode, handler, "water_logs.create", kwargs={"amount": {"value": 0.125, "unit": "cup"}})
+    assert b'"amount":{"value":0.125,"unit":"cup"}' in captured[0].read().replace(b" ", b"")
+    captured, handler = recorder(200, BY_ID["listWaterLogs"]["response"]["body"])
+    exercise(
+        mode,
+        handler,
+        "water_logs.list",
+        kwargs={
+            "start_date": "2026-09-01",
+            "end_date": "2026-09-10",
+            "timezone": "UTC",
+            "unit": "cup",
+        },
+    )
+    assert captured[0].url.params["unit"] == "cup"
+
+
+@pytest.mark.parametrize("mode", MODES)
 def test_list_water_logs_serializes_range_and_unit(mode: str) -> None:
     captured, handler = recorder(200, BY_ID["listWaterLogs"]["response"]["body"])
     result = exercise(

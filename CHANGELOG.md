@@ -5,7 +5,8 @@
 ## 0.2.0 - 2026-09-22
 
 - Add water logs: `water_logs.create`, `water_logs.list` (daily totals in the
-  requested unit) and `water_logs.delete` (idempotent).
+  requested unit) and `water_logs.delete` (idempotent). Amounts are in `fl_oz`,
+  `cup` or `ml`.
 - Add weight logs: `weight_logs.create` and `weight_logs.list` (latest weight per day).
 - Add the `water_logs:read`, `water_logs:write`, `weight_logs:read` and
   `weight_logs:write` client-token scopes.

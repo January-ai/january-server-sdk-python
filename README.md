@@ -271,7 +271,8 @@ and [runnable portion example](examples/portions/main.py).
 ### Water and weight logs
 
 Water and weight logs use the same user view as food logs. Water amounts are
-`fl_oz` or `ml`; weights are `lb` or `kg`. Both are stored in the unit you send.
+`fl_oz` (1–811.5), `cup` (0.125–101.4) or `ml` (30–24000); weights are `lb` or
+`kg`. Both are stored in the unit you send.
 
 ```python
 entry = user.water_logs.create(amount={"value": 250, "unit": "ml"})
