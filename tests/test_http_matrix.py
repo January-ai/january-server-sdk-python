@@ -175,7 +175,7 @@ def test_invalid_identity_stops_before_http(client_type):
     with local_service() as service:
         with pytest.raises(JanuaryValidationError):
             client_type(api_key="sk-local-fixture", base_url=service["url"]).for_user(
-                {"not": "a string"}  # pyright: ignore[reportArgumentType]
+                {"not": "a string"}
             )
         assert service["requests"] == []
 

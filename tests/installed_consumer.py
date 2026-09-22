@@ -192,7 +192,7 @@ def main():
             user = client.for_user("installed-photo-test")
             analysis = user.food_analysis.analyze_photo(image=photo.getvalue())
             assert service["requests"][-1]["body"]["image"].startswith("data:image/jpeg;base64,")
-            user.food_analysis.correct(analysis=analysis, instruction="smaller portion")  # pyright: ignore[reportArgumentType] -- FoodScan round-trips; generated hint pending
+            user.food_analysis.correct(analysis=analysis, instruction="smaller portion")
             assert service["requests"][-1]["body"]["analysis"]["detections"][0]["future_field"] == {
                 "value": 7
             }

@@ -30,7 +30,7 @@ def check_sync(client: January) -> None:
     # Returned lists and native timestamps must work without casts in user code.
     scan = client.food_analysis.analyze_description(query="eggs")
     assert_type(
-        client.food_analysis.correct(analysis=scan, instruction="less"),  # pyright: ignore[reportArgumentType] -- FoodScan round-trips; generated hint pending
+        client.food_analysis.correct(analysis=scan, instruction="less"),
         models.FoodScan,
     )
     assert_type(

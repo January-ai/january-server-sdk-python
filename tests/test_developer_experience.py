@@ -241,14 +241,14 @@ def test_response_correction_roundtrip_keeps_only_returned_model_extensions():
     ):
         user = client.for_user("owner")
         scan = user.food_analysis.analyze_photo(image="https://example.invalid/photo.jpg")
-        user.food_analysis.correct(analysis=scan, instruction="smaller portion")  # pyright: ignore[reportArgumentType] -- FoodScan round-trips; generated hint pending
+        user.food_analysis.correct(analysis=scan, instruction="smaller portion")
         assert requests[-1]["analysis"]["detections"][0]["future_detection"] == {"value": 7}
         assert requests[-1]["analysis"]["detections"][0]["food"]["future_food"] == "extra"
         bad_food = scan.detections[0].food.model_copy(update={"name": 42})
         bad_detection = scan.detections[0].model_copy(update={"food": bad_food})
         bad_scan = scan.model_copy(update={"detections": [bad_detection]})
         with pytest.raises(JanuaryValidationError):
-            user.food_analysis.correct(analysis=bad_scan, instruction="smaller")  # pyright: ignore[reportArgumentType] -- FoodScan round-trips; generated hint pending
+            user.food_analysis.correct(analysis=bad_scan, instruction="smaller")
     assert len(requests) == 2
     with pytest.raises(JanuaryValidationError):
         Contract().encode({"typo": 1}, {"type": "object", "properties": {}}, "request")
