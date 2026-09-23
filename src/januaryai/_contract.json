@@ -10,7 +10,7 @@
         },
         "code": {
           "type": "string",
-          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.",
+          "description": "A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`conflict` (409) means the request conflicts with an existing resource, such as an Idempotency-Key reused with different files. Resolve the conflict before retrying.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nFour more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called an operation that documents the January-End-User-ID header without sending it), `date_range_too_large` (400 — a date range past the operation's documented maximum or lookback), `daily_water_limit_exceeded` (400 — a water log that would take the end user's total for its day past 24 L; not retryable), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.",
           "example": "invalid_request"
         }
       },
@@ -31,7 +31,9 @@
         },
         "scopes": {
           "type": "array",
-          "description": "What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.",
+          "description": "What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read, water_logs:read, water_logs:write, weight_logs:read, weight_logs:write.",
+          "minItems": 1,
+          "maxItems": 10,
           "example": [
             "foods:read"
           ],
@@ -43,7 +45,11 @@
               "food_logs:read",
               "food_logs:write",
               "glucose:read",
-              "restaurants:read"
+              "restaurants:read",
+              "water_logs:read",
+              "water_logs:write",
+              "weight_logs:read",
+              "weight_logs:write"
             ]
           }
         },
@@ -101,7 +107,11 @@
               "food_logs:read",
               "food_logs:write",
               "glucose:read",
-              "restaurants:read"
+              "restaurants:read",
+              "water_logs:read",
+              "water_logs:write",
+              "weight_logs:read",
+              "weight_logs:write"
             ]
           }
         }
@@ -148,9 +158,7 @@
       "type": "object",
       "properties": {
         "plan": {
-          "type": "string",
-          "description": "The plan this allowance comes from.",
-          "example": "free"
+          "$ref": "#/components/schemas/CreditPlan"
         },
         "period_start": {
           "type": "string",
@@ -207,9 +215,7 @@
           "example": 300
         },
         "unit": {
-          "type": "string",
-          "example": "g",
-          "description": "Canonical across the API: g, mg, kcal, IU."
+          "$ref": "#/components/schemas/NutrientUnit"
         }
       },
       "required": [
@@ -277,7 +283,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "nullable": true,
+          "pattern": "^[1-9]\\d{0,9}$",
           "example": "68051535",
           "description": "Opaque serving id; may look numeric but is always a string."
         },
@@ -325,6 +331,7 @@
         "id": {
           "type": "string",
           "example": "101963552",
+          "pattern": "^[1-9]\\d{0,9}$",
           "description": "Opaque id — pass it back verbatim to log, predict, or fetch this food."
         },
         "type": {
@@ -422,6 +429,7 @@
         "id": {
           "type": "string",
           "example": "70376053",
+          "pattern": "^[1-9]\\d{0,9}$",
           "description": "Opaque id — the same id `GET /v1.2/foods/{food_id}` takes."
         },
         "type": {
@@ -495,6 +503,7 @@
             "gluten",
             "peanuts"
           ],
+          "maxItems": 17,
           "items": {
             "$ref": "#/components/schemas/DietRestriction"
           }
@@ -505,6 +514,7 @@
           "example": [
             "vegetarian"
           ],
+          "maxItems": 9,
           "items": {
             "$ref": "#/components/schemas/DietPreference"
           }
@@ -517,27 +527,39 @@
       "properties": {
         "id": {
           "type": "string",
-          "nullable": true,
+          "pattern": "^[1-9]\\d{0,9}$",
           "example": "34237662",
-          "description": "Null only when the producer sent a serving with no id."
+          "description": "Catalog serving id. Pass it back as serving_id when logging this food."
         },
         "quantity": {
           "type": "number",
-          "nullable": true,
           "example": 1,
-          "description": "How much of `unit` this serving is; null when the producer reported none."
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 10000,
+          "description": "Positive amount of unit represented by this serving definition. In food analysis and food logs this is one catalog serving: consumed amount = food.quantity × food.serving.quantity (4 × 0.5 cup = 2 cups). Food alternatives instead report their recommended portion amount here."
         },
         "unit": {
           "type": "string",
           "nullable": true,
           "example": "cup",
+          "minLength": 1,
+          "maxLength": 64,
           "description": "Null only when the producer sent a serving with no unit."
+        },
+        "weight_grams": {
+          "type": "number",
+          "nullable": true,
+          "minimum": 0,
+          "example": 60,
+          "description": "Weight in grams of this serving definition. For food analysis and food logs this is one catalog serving, not the consumed portion: consumed grams = food.quantity × food.serving.weight_grams. Null when unknown."
         }
       },
       "required": [
         "id",
         "quantity",
-        "unit"
+        "unit",
+        "weight_grams"
       ],
       "x-january-upstream-schema": "ServingSummary"
     },
@@ -546,9 +568,9 @@
       "properties": {
         "id": {
           "type": "string",
-          "nullable": true,
+          "pattern": "^[1-9]\\d{0,9}$",
           "example": "70379835",
-          "description": "Catalog food id, or null when the producer matched none."
+          "description": "Catalog food id."
         },
         "name": {
           "type": "string",
@@ -611,7 +633,7 @@
         },
         "id": {
           "type": "string",
-          "example": "53fc3b8a-e6bf-404d-83c8-9f42124d1bee"
+          "example": "94293e99-ee95-40bf-98bd-508402af9f9e"
         },
         "name": {
           "type": "string",
@@ -681,9 +703,9 @@
       "properties": {
         "id": {
           "type": "string",
-          "nullable": true,
+          "pattern": "^[1-9]\\d{0,9}$",
           "example": "228990954",
-          "description": "Food id of the dish — the same id `GET /v1.2/foods/{food_id}` and `POST /v1.2/food-logs` take. Null only when the menu source carries no id for the row."
+          "description": "Food id of the dish — the same id `GET /v1.2/foods/{food_id}` and `POST /v1.2/food-logs` take."
         },
         "name": {
           "type": "string",
@@ -870,9 +892,9 @@
         },
         "reasoning": {
           "default": {
-            "effort": "none"
+            "effort": "xhigh"
           },
-          "description": "Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
+          "description": "Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
           "allOf": [
             {
               "$ref": "#/components/schemas/AnalysisReasoning"
@@ -888,17 +910,13 @@
     "DetectedFood": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string",
-          "nullable": true,
-          "example": "70379835",
-          "description": "Catalog food id, or null when the producer matched none."
-        },
         "name": {
           "type": "string",
           "nullable": true,
           "example": "Oatmeal",
-          "description": "Null only when the producer sent a food with no name."
+          "description": "Null only when the producer sent a food with no name.",
+          "minLength": 1,
+          "maxLength": 256
         },
         "brand_name": {
           "type": "string",
@@ -906,10 +924,18 @@
           "example": null,
           "description": "Null for generic (non-branded) foods."
         },
+        "id": {
+          "type": "string",
+          "pattern": "^[1-9]\\d{0,9}$",
+          "example": "70379835",
+          "description": "Matched catalog food id. Pass it back as food_id when logging this food."
+        },
         "quantity": {
           "type": "number",
-          "nullable": true,
-          "description": "Number of catalog servings consumed, ready to use as food-log quantity. For 40 g from a 100 g serving this is 0.4. Null when the producer supplied no usable portion.",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 10000,
+          "description": "Positive number of selected catalog servings consumed. Use it unchanged as food-log quantity. Display the consumed amount as food.quantity × food.serving.quantity, followed by food.serving.unit: 4 × 0.5 cup = 2 cups; 0.4 × 100 g = 40 g. Nutrients already describe this consumed portion; do not multiply them again.",
           "example": 0.4
         },
         "serving": {
@@ -921,7 +947,7 @@
           ]
         },
         "nutrients": {
-          "description": "Nutrition for the consumed portion, already scaled by quantity.",
+          "description": "Nutrition for the consumed portion, already scaled by quantity. Send the analysis back unchanged for corrections.",
           "allOf": [
             {
               "$ref": "#/components/schemas/NutritionFacts"
@@ -930,9 +956,9 @@
         }
       },
       "required": [
-        "id",
         "name",
         "brand_name",
+        "id",
         "quantity",
         "serving",
         "nutrients"
@@ -962,7 +988,9 @@
           "type": "string",
           "nullable": true,
           "example": "Breakfast Bowl",
-          "description": "A name for the meal as a whole. Null on text analyses — the caller already has the words."
+          "maxLength": 256,
+          "pattern": "\\S",
+          "description": "A name for the meal as a whole. Null on text analyses — the caller already has the words. Corrections preserve a null meal name."
         },
         "total_nutrients": {
           "description": "Aggregated nutrition across all detections. Always present; individual keys are omitted when no producer had a value.",
@@ -973,6 +1001,7 @@
           ]
         },
         "detections": {
+          "maxItems": 100,
           "description": "Detected foods. Always present — an empty array means nothing was recognized.",
           "type": "array",
           "items": {
@@ -1002,14 +1031,155 @@
       ],
       "x-january-upstream-schema": "TextFoodAnalysisRequest"
     },
+    "CorrectionServing": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[1-9]\\d{0,9}$",
+          "example": "34237662",
+          "description": "Catalog serving id. Pass it back as serving_id when logging this food."
+        },
+        "quantity": {
+          "type": "number",
+          "example": 1,
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 10000,
+          "description": "Positive amount of unit represented by this serving definition. In food analysis and food logs this is one catalog serving: consumed amount = food.quantity × food.serving.quantity (4 × 0.5 cup = 2 cups). Food alternatives instead report their recommended portion amount here."
+        },
+        "unit": {
+          "type": "string",
+          "nullable": true,
+          "example": "cup",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Null only when the producer sent a serving with no unit."
+        },
+        "weight_grams": {
+          "type": "number",
+          "nullable": true,
+          "minimum": 0,
+          "example": 60,
+          "description": "Weight in grams of this serving definition. For food analysis and food logs this is one catalog serving, not the consumed portion: consumed grams = food.quantity × food.serving.weight_grams. Null when unknown."
+        }
+      },
+      "required": [
+        "id",
+        "quantity",
+        "unit"
+      ],
+      "x-january-upstream-schema": "CorrectionServing"
+    },
+    "CorrectionFood": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "nullable": true,
+          "example": "Oatmeal",
+          "description": "Null only when the producer sent a food with no name.",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "brand_name": {
+          "type": "string",
+          "nullable": true,
+          "example": null,
+          "description": "Null for generic (non-branded) foods."
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[1-9]\\d{0,9}$",
+          "example": "70379835",
+          "description": "Matched catalog food id. Pass it back as food_id when logging this food."
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMinimum": true,
+          "maximum": 10000,
+          "description": "Positive number of selected catalog servings consumed. Use it unchanged as food-log quantity. Display the consumed amount as food.quantity × food.serving.quantity, followed by food.serving.unit: 4 × 0.5 cup = 2 cups; 0.4 × 100 g = 40 g. Nutrients already describe this consumed portion; do not multiply them again.",
+          "example": 0.4
+        },
+        "nutrients": {
+          "description": "Nutrition for the consumed portion, already scaled by quantity. Send the analysis back unchanged for corrections.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        },
+        "serving": {
+          "$ref": "#/components/schemas/CorrectionServing"
+        }
+      },
+      "required": [
+        "name",
+        "brand_name",
+        "id",
+        "quantity",
+        "nutrients",
+        "serving"
+      ],
+      "x-january-upstream-schema": "CorrectionFood"
+    },
+    "CorrectionDetection": {
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "$ref": "#/components/schemas/ConfidenceScore"
+        },
+        "food": {
+          "$ref": "#/components/schemas/CorrectionFood"
+        }
+      },
+      "required": [
+        "confidence",
+        "food"
+      ],
+      "x-january-upstream-schema": "CorrectionDetection"
+    },
+    "CorrectionAnalysis": {
+      "type": "object",
+      "properties": {
+        "meal_name": {
+          "type": "string",
+          "nullable": true,
+          "example": "Breakfast Bowl",
+          "maxLength": 256,
+          "pattern": "\\S",
+          "description": "A name for the meal as a whole. Null on text analyses — the caller already has the words. Corrections preserve a null meal name."
+        },
+        "total_nutrients": {
+          "description": "Optional original totals. Ignored on input; corrections recalculate totals from the corrected foods.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/NutritionFacts"
+            }
+          ]
+        },
+        "detections": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/CorrectionDetection"
+          }
+        }
+      },
+      "required": [
+        "detections"
+      ],
+      "x-january-upstream-schema": "CorrectionAnalysis"
+    },
     "CorrectPhotoScanBody": {
       "type": "object",
       "properties": {
         "analysis": {
-          "description": "The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.",
+          "description": "The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically. `meal_name` may be omitted (treated as null); `total_nutrients` may be omitted because it is recalculated rather than trusted. Older results may omit serving `weight_grams`; it is treated as unknown. The forwarded nutrients (calories, protein, carbohydrates, net_carbohydrates, total_fat, saturated_fat, fiber, total_sugars, added_sugars, sodium) must each have a `value` from 0 to 1000000 and a `unit` of at most 16 characters; every analysis result already satisfies this. A detection the analysis returned incomplete — with a null `name` or serving `unit` — is left out of the corrected result, because the correction model needs what it lacks; describe that food in `instruction` if it belongs in the meal.",
           "allOf": [
             {
-              "$ref": "#/components/schemas/FoodScan"
+              "$ref": "#/components/schemas/CorrectionAnalysis"
             }
           ]
         },
@@ -1055,6 +1225,7 @@
       "type": "object",
       "properties": {
         "foods": {
+          "minItems": 1,
           "maxItems": 100,
           "type": "array",
           "items": {
@@ -1078,50 +1249,14 @@
       ],
       "x-january-upstream-schema": "CreateFoodLogRequest"
     },
-    "ServingDetails": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "nullable": true,
-          "example": "68051535",
-          "description": "Null only when the upstream sent a serving with no id."
-        },
-        "quantity": {
-          "type": "number",
-          "nullable": true,
-          "example": 1,
-          "description": "How many units make up one of this serving, e.g. 1 for \"1 cup\". Null when the upstream reported none."
-        },
-        "unit": {
-          "type": "string",
-          "nullable": true,
-          "example": "cup",
-          "description": "Null only when the upstream sent a serving with no unit."
-        },
-        "weight_grams": {
-          "type": "number",
-          "nullable": true,
-          "example": 245,
-          "description": "Null when the upstream has no gram weight for this serving."
-        }
-      },
-      "required": [
-        "id",
-        "quantity",
-        "unit",
-        "weight_grams"
-      ],
-      "x-january-upstream-schema": "ServingDetails"
-    },
     "LoggedFood": {
       "type": "object",
       "properties": {
         "food_id": {
           "type": "string",
-          "nullable": true,
+          "pattern": "^[1-9]\\d{0,9}$",
           "example": "101963552",
-          "description": "Food id from a search or food-analysis result. Null only when the upstream sent a food with no id."
+          "description": "Food id from a search or food-analysis result."
         },
         "name": {
           "type": "string",
@@ -1162,13 +1297,13 @@
           "type": "number",
           "nullable": true,
           "example": 1.4,
-          "description": "How many of the serving below were consumed. Null only when the upstream sent no consumed quantity."
+          "description": "Number of selected servings consumed. Consumed amount = food.quantity × food.serving.quantity, in food.serving.unit (4 × 0.5 cup = 2 cups). Nutrients are already scaled to this portion. Null when unavailable."
         },
         "serving": {
           "description": "The serving definition the quantity refers to.",
           "allOf": [
             {
-              "$ref": "#/components/schemas/ServingDetails"
+              "$ref": "#/components/schemas/ServingSummary"
             }
           ]
         }
@@ -1396,6 +1531,7 @@
       "type": "object",
       "properties": {
         "foods": {
+          "minItems": 1,
           "maxItems": 100,
           "type": "array",
           "items": {
@@ -1414,31 +1550,175 @@
           "maxLength": 256
         }
       },
+      "minProperties": 1,
+      "additionalProperties": false,
       "x-january-upstream-schema": "UpdateFoodLogRequest"
     },
-    "Height": {
+    "WaterAmount": {
       "type": "object",
       "properties": {
         "value": {
           "type": "number",
-          "example": 66
+          "example": 8,
+          "minimum": 0.125,
+          "maximum": 24000,
+          "description": "Accepted range depends on unit: 1–811.5 fl_oz, 0.125–101.4 cup, 30–24000 ml.",
+          "x-january-derived-from": "/components/schemas/WaterAmount/properties/value",
+          "x-january-overlay-id": "NORMALIZATION-079",
+          "x-january-evidence": "EVIDENCE-014"
         },
         "unit": {
-          "$ref": "#/components/schemas/HeightUnit"
+          "$ref": "#/components/schemas/VolumeUnit"
         }
       },
       "required": [
         "value",
         "unit"
       ],
-      "x-january-upstream-schema": "Height"
+      "x-january-upstream-schema": "WaterAmount",
+      "x-january-range-by-unit": {
+        "valueProperty": "value",
+        "unitProperty": "unit",
+        "ranges": {
+          "fl_oz": {
+            "minimum": 1,
+            "maximum": 811.5
+          },
+          "ml": {
+            "minimum": 30,
+            "maximum": 24000
+          },
+          "cup": {
+            "minimum": 0.125,
+            "maximum": 101.4
+          }
+        }
+      },
+      "x-january-derived-from": "/components/schemas/WaterAmount",
+      "x-january-overlay-id": "NORMALIZATION-082",
+      "x-january-evidence": "EVIDENCE-015"
+    },
+    "CreateWaterLogBody": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "description": "How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/WaterAmount"
+            }
+          ]
+        },
+        "consumed_at": {
+          "type": "string",
+          "example": "2026-09-10T07:30:00-07:00",
+          "format": "date-time",
+          "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against."
+        }
+      },
+      "required": [
+        "amount"
+      ],
+      "x-january-upstream-schema": "CreateWaterLogRequest"
+    },
+    "WaterLog": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "78129823-8ba2-4183-b13b-71f0e963c606",
+          "description": "Save this id to delete the log."
+        },
+        "amount": {
+          "description": "The amount as logged, in the unit it was sent in.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/WaterAmount"
+            }
+          ]
+        },
+        "consumed_at": {
+          "type": "string",
+          "example": "2026-09-10T14:30:00.000Z",
+          "format": "date-time",
+          "description": "When the water was consumed. UTC, with milliseconds."
+        }
+      },
+      "required": [
+        "id",
+        "amount",
+        "consumed_at"
+      ],
+      "x-january-upstream-schema": "WaterLog"
+    },
+    "Volume": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "example": 64,
+          "minimum": 0,
+          "description": "Rounded to one decimal place."
+        },
+        "unit": {
+          "$ref": "#/components/schemas/VolumeUnit"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "x-january-upstream-schema": "Volume"
+    },
+    "DailyWaterTotal": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "example": "2026-09-10",
+          "format": "date",
+          "description": "Local calendar date in the request’s `timezone`."
+        },
+        "total": {
+          "description": "Everything logged on this local day, in the unit the request asked for.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Volume"
+            }
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "total"
+      ],
+      "x-january-upstream-schema": "DailyWaterTotal"
+    },
+    "ListWaterLogsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "One entry per local day with water logged, oldest first. Days with nothing logged are absent. An empty list is a valid result.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DailyWaterTotal"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "x-january-upstream-schema": "WaterLogList"
     },
     "Weight": {
       "type": "object",
       "properties": {
         "value": {
           "type": "number",
-          "example": 150
+          "example": 150,
+          "minimum": 1,
+          "maximum": 1500,
+          "description": "Accepted range depends on unit: 2–1500 lb, 1–700 kg."
         },
         "unit": {
           "$ref": "#/components/schemas/WeightUnit"
@@ -1448,14 +1728,174 @@
         "value",
         "unit"
       ],
-      "x-january-upstream-schema": "Weight"
+      "x-january-upstream-schema": "Weight",
+      "x-january-range-by-unit": {
+        "valueProperty": "value",
+        "unitProperty": "unit",
+        "ranges": {
+          "lb": {
+            "minimum": 2,
+            "maximum": 1500
+          },
+          "kg": {
+            "minimum": 1,
+            "maximum": 700
+          }
+        }
+      },
+      "x-january-derived-from": "/components/schemas/Weight",
+      "x-january-overlay-id": "NORMALIZATION-083",
+      "x-january-evidence": "EVIDENCE-015"
+    },
+    "CreateWeightLogBody": {
+      "type": "object",
+      "properties": {
+        "weight": {
+          "description": "The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Weight"
+            }
+          ],
+          "x-january-range-by-unit": {
+            "valueProperty": "value",
+            "unitProperty": "unit",
+            "ranges": {
+              "lb": {
+                "minimum": 10,
+                "maximum": 1000
+              },
+              "kg": {
+                "minimum": 4.5,
+                "maximum": 453.6
+              }
+            }
+          },
+          "x-january-derived-from": "/components/schemas/CreateWeightLogRequest/properties/weight",
+          "x-january-overlay-id": "NORMALIZATION-084",
+          "x-january-evidence": "EVIDENCE-015"
+        },
+        "measured_at": {
+          "type": "string",
+          "example": "2026-09-10T07:30:00-07:00",
+          "format": "date-time",
+          "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+        }
+      },
+      "required": [
+        "weight"
+      ],
+      "x-january-upstream-schema": "CreateWeightLogRequest"
+    },
+    "WeightLog": {
+      "type": "object",
+      "properties": {
+        "weight": {
+          "description": "The weight as logged, in the unit it was sent in.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Weight"
+            }
+          ]
+        },
+        "measured_at": {
+          "type": "string",
+          "example": "2026-09-10T14:30:00.000Z",
+          "format": "date-time",
+          "description": "When the weight was measured. UTC, with milliseconds."
+        }
+      },
+      "required": [
+        "weight",
+        "measured_at"
+      ],
+      "x-january-upstream-schema": "WeightLog"
+    },
+    "DailyWeight": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "example": "2026-09-10",
+          "format": "date",
+          "description": "Local calendar date in the request’s `timezone`."
+        },
+        "weight": {
+          "description": "The weight with the latest `measured_at` on this day — later measurements replace earlier ones — in the unit it was logged in.",
+          "allOf": [
+            {
+              "$ref": "#/components/schemas/Weight"
+            }
+          ]
+        }
+      },
+      "required": [
+        "date",
+        "weight"
+      ],
+      "x-january-upstream-schema": "DailyWeight"
+    },
+    "ListWeightLogsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "One entry per day that has a weight, oldest first. Days with no weight are absent. An empty list is a valid result.",
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DailyWeight"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "x-january-upstream-schema": "WeightLogList"
+    },
+    "Height": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number",
+          "example": 66,
+          "minimum": 20,
+          "maximum": 275,
+          "description": "Accepted range depends on unit: 20–108 in, 50–275 cm."
+        },
+        "unit": {
+          "$ref": "#/components/schemas/HeightUnit"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "x-january-upstream-schema": "Height",
+      "x-january-range-by-unit": {
+        "valueProperty": "value",
+        "unitProperty": "unit",
+        "ranges": {
+          "in": {
+            "minimum": 20,
+            "maximum": 108
+          },
+          "cm": {
+            "minimum": 50,
+            "maximum": 275
+          }
+        }
+      },
+      "x-january-derived-from": "/components/schemas/Height",
+      "x-january-overlay-id": "NORMALIZATION-085",
+      "x-january-evidence": "EVIDENCE-015"
     },
     "GlucosePredictionProfile": {
       "type": "object",
       "properties": {
         "age": {
-          "type": "number",
-          "example": 42
+          "type": "integer",
+          "example": 42,
+          "minimum": 1,
+          "maximum": 120
         },
         "sex": {
           "$ref": "#/components/schemas/Sex"
@@ -1471,6 +1911,7 @@
         },
         "health_conditions": {
           "type": "array",
+          "maxItems": 2,
           "example": [
             "prediabetes"
           ],
@@ -1500,7 +1941,9 @@
         "value": {
           "type": "number",
           "example": 104,
-          "description": "mg/dL. At most one reading per 15-minute window."
+          "description": "mg/dL. At most one reading per 15-minute window.",
+          "minimum": 10,
+          "maximum": 600
         }
       },
       "required": [
@@ -1521,11 +1964,13 @@
         "food_id": {
           "type": "string",
           "example": "101963552",
+          "pattern": "^[1-9]\\d{0,9}$",
           "description": "Food id from a search or food-analysis result."
         },
         "serving_id": {
           "type": "string",
           "example": "68051535",
+          "pattern": "^[1-9]\\d{0,9}$",
           "description": "One of the food's serving ids."
         },
         "quantity": {
@@ -1558,6 +2003,7 @@
         },
         "foods": {
           "description": "The meal to predict the glucose response for.",
+          "minItems": 1,
           "maxItems": 100,
           "type": "array",
           "items": {
@@ -1572,6 +2018,8 @@
         },
         "cgm_data": {
           "description": "Optional CGM history, to personalize the prediction to this end user. Send it together with `consumed_foods` covering the same period — **at least 5 complete days of paired history**, which is what the model needs to train on them. Fewer is refused with `invalid_request`. Omit both fields for a standard prediction, which needs no sensor and no history.",
+          "minItems": 1,
+          "maxItems": 5000,
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/CgmReading"
@@ -1579,6 +2027,8 @@
         },
         "consumed_foods": {
           "description": "The meals eaten during the CGM history; requires cgm_data.",
+          "minItems": 1,
+          "maxItems": 5000,
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/ConsumedHistoricalFood"
@@ -1662,7 +2112,7 @@
     "FoodId": {
       "type": "string",
       "format": "opaque",
-      "pattern": "^[0-9]{1,16}$",
+      "pattern": "^[1-9]\\d{0,9}$",
       "example": "133892962",
       "description": "Opaque food identifier; pass it back verbatim.",
       "x-january-derived-from": [
@@ -1675,7 +2125,7 @@
     "ServingId": {
       "type": "string",
       "format": "opaque",
-      "pattern": "^[0-9]{1,16}$",
+      "pattern": "^[1-9]\\d{0,9}$",
       "example": "142722827",
       "description": "Opaque serving identifier; pass it back verbatim.",
       "x-january-derived-from": [
@@ -1695,6 +2145,16 @@
       ],
       "x-january-overlay-id": "NORMALIZATION-004"
     },
+    "WaterLogId": {
+      "type": "string",
+      "format": "uuid",
+      "example": "78129823-8ba2-4183-b13b-71f0e963c606",
+      "description": "Stable water-log identifier.",
+      "x-january-derived-from": [
+        "/paths/~1v1.2~1water-logs~1{log_id}/delete/parameters/1/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-067"
+    },
     "PartnerUserId": {
       "type": "string",
       "format": "opaque",
@@ -1708,7 +2168,7 @@
     "RestaurantMenuItemId": {
       "type": "string",
       "format": "opaque",
-      "minLength": 1,
+      "pattern": "^[1-9]\\d{0,9}$",
       "example": "228990954",
       "description": "Opaque restaurant menu-item identifier.",
       "x-january-derived-from": [
@@ -1803,7 +2263,8 @@
       "example": "high",
       "description": "How sure the vision model is of this detection. Null on text analyses and on corrected results.",
       "x-january-derived-from": [
-        "/components/schemas/Detection/properties/confidence"
+        "/components/schemas/Detection/properties/confidence",
+        "/components/schemas/CorrectionDetection/properties/confidence"
       ],
       "x-january-overlay-id": "NORMALIZATION-011"
     },
@@ -1883,6 +2344,57 @@
         "/components/schemas/Weight/properties/unit"
       ],
       "x-january-overlay-id": "NORMALIZATION-062"
+    },
+    "VolumeUnit": {
+      "type": "string",
+      "enum": [
+        "fl_oz",
+        "ml",
+        "cup"
+      ],
+      "example": "fl_oz",
+      "x-january-derived-from": [
+        "/components/schemas/WaterAmount/properties/unit",
+        "/components/schemas/Volume/properties/unit",
+        "/paths/~1v1.2~1water-logs/get/parameters/4/schema"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-068",
+      "x-january-patch-overlay-ids": [
+        "NORMALIZATION-078"
+      ],
+      "x-january-evidence": "EVIDENCE-014"
+    },
+    "NutrientUnit": {
+      "type": "string",
+      "enum": [
+        "g",
+        "mg",
+        "kcal",
+        "IU",
+        "mcg"
+      ],
+      "example": "g",
+      "description": "Canonical across the API: g, mg, kcal, IU, mcg. Read it from each amount rather than assuming a unit per nutrient.",
+      "x-january-derived-from": [
+        "/components/schemas/NutrientAmount/properties/unit"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-074"
+    },
+    "CreditPlan": {
+      "type": "string",
+      "enum": [
+        "free",
+        "pro",
+        "startup",
+        "enterprise",
+        "unlimited"
+      ],
+      "description": "The plan this allowance comes from. `unlimited` is a partner with no ceiling, for whom both ceiling fields are `null`.",
+      "example": "free",
+      "x-january-derived-from": [
+        "/components/schemas/CreditBalance/properties/plan"
+      ],
+      "x-january-overlay-id": "NORMALIZATION-075"
     }
   },
   "operations": {
@@ -1916,7 +2428,9 @@
           "publicName": "scopes",
           "schema": {
             "type": "array",
-            "description": "What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.",
+            "description": "What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read, water_logs:read, water_logs:write, weight_logs:read, weight_logs:write.",
+            "minItems": 1,
+            "maxItems": 10,
             "example": [
               "foods:read"
             ],
@@ -1928,7 +2442,11 @@
                 "food_logs:read",
                 "food_logs:write",
                 "glucose:read",
-                "restaurants:read"
+                "restaurants:read",
+                "water_logs:read",
+                "water_logs:write",
+                "weight_logs:read",
+                "weight_logs:write"
               ]
             }
           },
@@ -2194,6 +2712,7 @@
               "gluten",
               "peanuts"
             ],
+            "maxItems": 17,
             "items": {
               "$ref": "#/components/schemas/DietRestriction"
             }
@@ -2209,6 +2728,7 @@
             "example": [
               "vegetarian"
             ],
+            "maxItems": 9,
             "items": {
               "$ref": "#/components/schemas/DietPreference"
             }
@@ -2438,7 +2958,7 @@
           "schema": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,64}$",
-            "example": "53fc3b8a-e6bf-404d-83c8-9f42124d1bee"
+            "example": "94293e99-ee95-40bf-98bd-508402af9f9e"
           },
           "publicName": "restaurant_id"
         }
@@ -2575,9 +3095,9 @@
           "publicName": "reasoning",
           "schema": {
             "default": {
-              "effort": "none"
+              "effort": "xhigh"
             },
-            "description": "Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
+            "description": "Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AnalysisReasoning"
@@ -2660,10 +3180,10 @@
           "name": "analysis",
           "publicName": "analysis",
           "schema": {
-            "description": "The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.",
+            "description": "The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically. `meal_name` may be omitted (treated as null); `total_nutrients` may be omitted because it is recalculated rather than trusted. Older results may omit serving `weight_grams`; it is treated as unknown. The forwarded nutrients (calories, protein, carbohydrates, net_carbohydrates, total_fat, saturated_fat, fiber, total_sugars, added_sugars, sodium) must each have a `value` from 0 to 1000000 and a `unit` of at most 16 characters; every analysis result already satisfies this. A detection the analysis returned incomplete — with a null `name` or serving `unit` — is left out of the corrected result, because the correction model needs what it lacks; describe that food in `instruction` if it belongs in the meal.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/FoodScan"
+                "$ref": "#/components/schemas/CorrectionAnalysis"
               }
             ]
           },
@@ -2710,7 +3230,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -2723,6 +3243,7 @@
           "name": "foods",
           "publicName": "foods",
           "schema": {
+            "minItems": 1,
             "maxItems": 100,
             "type": "array",
             "items": {
@@ -2782,7 +3303,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -2817,7 +3338,7 @@
           "name": "timezone",
           "required": true,
           "in": "query",
-          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.",
           "schema": {
             "example": "America/Los_Angeles",
             "type": "string"
@@ -2853,7 +3374,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -2888,7 +3409,7 @@
           "name": "timezone",
           "required": true,
           "in": "query",
-          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.",
           "schema": {
             "example": "America/Los_Angeles",
             "type": "string"
@@ -2954,7 +3475,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -3000,7 +3521,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -3023,6 +3544,7 @@
           "name": "foods",
           "publicName": "foods",
           "schema": {
+            "minItems": 1,
             "maxItems": 100,
             "type": "array",
             "items": {
@@ -3082,7 +3604,7 @@
         {
           "name": "January-End-User-ID",
           "in": "header",
-          "description": "Your stable ID for the end user whose food logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
           "required": false,
           "schema": {
             "$ref": "#/components/schemas/PartnerUserId"
@@ -3106,6 +3628,345 @@
         "204": null
       },
       "responseType": "ResponseMetadata",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
+    },
+    "createWaterLog": {
+      "operationId": "createWaterLog",
+      "method": "POST",
+      "path": "/v1.2/water-logs",
+      "resource": "waterLogs",
+      "publicMethod": "create",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "amount",
+          "publicName": "amount",
+          "schema": {
+            "description": "How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WaterAmount"
+              }
+            ]
+          },
+          "required": true
+        },
+        {
+          "name": "consumed_at",
+          "publicName": "consumed_at",
+          "schema": {
+            "type": "string",
+            "example": "2026-09-10T07:30:00-07:00",
+            "format": "date-time",
+            "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against."
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/CreateWaterLogBody"
+      },
+      "responses": {
+        "201": {
+          "$ref": "#/components/schemas/WaterLog"
+        }
+      },
+      "responseType": "WaterLog",
+      "retryNever": false,
+      "retryAmbiguous": false,
+      "photoPreparation": false
+    },
+    "listWaterLogs": {
+      "operationId": "listWaterLogs",
+      "method": "GET",
+      "path": "/v1.2/water-logs",
+      "resource": "waterLogs",
+      "publicMethod": "list",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "start_date",
+          "required": true,
+          "in": "query",
+          "description": "First local calendar date in `timezone`, inclusive. May be at most 5 years before today in `timezone`.",
+          "schema": {
+            "format": "date",
+            "example": "2026-09-01",
+            "type": "string"
+          },
+          "publicName": "start_date"
+        },
+        {
+          "name": "end_date",
+          "required": true,
+          "in": "query",
+          "description": "Last local calendar date in `timezone`, inclusive. May equal start_date for a single day. When more than 100 days in the range have water logged, the most recent 100 are returned.",
+          "schema": {
+            "format": "date",
+            "example": "2026-09-10",
+            "type": "string"
+          },
+          "publicName": "end_date"
+        },
+        {
+          "name": "timezone",
+          "required": true,
+          "in": "query",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.",
+          "schema": {
+            "example": "America/Los_Angeles",
+            "type": "string"
+          },
+          "publicName": "timezone"
+        },
+        {
+          "name": "unit",
+          "required": true,
+          "in": "query",
+          "description": "The unit every daily total is returned in.",
+          "schema": {
+            "$ref": "#/components/schemas/VolumeUnit"
+          },
+          "publicName": "unit"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/ListWaterLogsResponse"
+        }
+      },
+      "responseType": "ListWaterLogsResponse",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
+    },
+    "deleteWaterLog": {
+      "operationId": "deleteWaterLog",
+      "method": "DELETE",
+      "path": "/v1.2/water-logs/{log_id}",
+      "resource": "waterLogs",
+      "publicMethod": "delete",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "log_id",
+          "required": true,
+          "in": "path",
+          "description": "The log id returned when the log was created.",
+          "schema": {
+            "$ref": "#/components/schemas/WaterLogId"
+          },
+          "publicName": "log_id"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "204": null
+      },
+      "responseType": "ResponseMetadata",
+      "retryNever": false,
+      "retryAmbiguous": true,
+      "photoPreparation": false
+    },
+    "createWeightLog": {
+      "operationId": "createWeightLog",
+      "method": "POST",
+      "path": "/v1.2/weight-logs",
+      "resource": "weightLogs",
+      "publicMethod": "create",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        }
+      ],
+      "fields": [
+        {
+          "name": "weight",
+          "publicName": "weight",
+          "schema": {
+            "description": "The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Weight"
+              }
+            ],
+            "x-january-range-by-unit": {
+              "valueProperty": "value",
+              "unitProperty": "unit",
+              "ranges": {
+                "lb": {
+                  "minimum": 10,
+                  "maximum": 1000
+                },
+                "kg": {
+                  "minimum": 4.5,
+                  "maximum": 453.6
+                }
+              }
+            },
+            "x-january-derived-from": "/components/schemas/CreateWeightLogRequest/properties/weight",
+            "x-january-overlay-id": "NORMALIZATION-084",
+            "x-january-evidence": "EVIDENCE-015"
+          },
+          "required": true
+        },
+        {
+          "name": "measured_at",
+          "publicName": "measured_at",
+          "schema": {
+            "type": "string",
+            "example": "2026-09-10T07:30:00-07:00",
+            "format": "date-time",
+            "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+          },
+          "required": false
+        }
+      ],
+      "bodySchema": {
+        "$ref": "#/components/schemas/CreateWeightLogBody"
+      },
+      "responses": {
+        "201": {
+          "$ref": "#/components/schemas/WeightLog"
+        }
+      },
+      "responseType": "WeightLog",
+      "retryNever": false,
+      "retryAmbiguous": false,
+      "photoPreparation": false
+    },
+    "listWeightLogs": {
+      "operationId": "listWeightLogs",
+      "method": "GET",
+      "path": "/v1.2/weight-logs",
+      "resource": "weightLogs",
+      "publicMethod": "list",
+      "audience": "shared",
+      "parameterNames": {
+        "January-End-User-ID": "endUserId",
+        "x-end-user-id": "endUserId",
+        "x-end-user-timezone": "endUserTimezone"
+      },
+      "parameters": [
+        {
+          "name": "January-End-User-ID",
+          "in": "header",
+          "description": "Your stable ID for the end user whose logs this request reads or writes. Opaque to January — use the same ID your system already uses for them.\n\n| Credential | Header | Result |\n| --- | --- | --- |\n| API key (`sk-…`) | absent | `400 end_user_id_required` |\n| API key (`sk-…`) | present | the request acts on that end user |\n| Client token (`ct-…`) | absent | filled in from the token |\n| Client token (`ct-…`) | the end user the token is bound to | accepted |\n| Client token (`ct-…`) | any other end user | `403 end_user_id_mismatch` |",
+          "required": false,
+          "schema": {
+            "$ref": "#/components/schemas/PartnerUserId"
+          },
+          "publicName": "end_user_id"
+        },
+        {
+          "name": "start_date",
+          "required": true,
+          "in": "query",
+          "description": "First local calendar date in `timezone`, inclusive. May be at most 5 years before today in `timezone`.",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-01",
+            "type": "string"
+          },
+          "publicName": "start_date"
+        },
+        {
+          "name": "end_date",
+          "required": true,
+          "in": "query",
+          "description": "Last local calendar date in `timezone`, inclusive. May equal start_date for a single day. When more than 100 days in the range have a weight, the most recent 100 are returned.",
+          "schema": {
+            "format": "date",
+            "example": "2024-09-08",
+            "type": "string"
+          },
+          "publicName": "end_date"
+        },
+        {
+          "name": "timezone",
+          "required": true,
+          "in": "query",
+          "description": "IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.",
+          "schema": {
+            "example": "America/Los_Angeles",
+            "type": "string"
+          },
+          "publicName": "timezone"
+        }
+      ],
+      "fields": [],
+      "bodySchema": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/ListWeightLogsResponse"
+        }
+      },
+      "responseType": "ListWeightLogsResponse",
       "retryNever": false,
       "retryAmbiguous": true,
       "photoPreparation": false
@@ -3147,6 +4008,7 @@
           "publicName": "foods",
           "schema": {
             "description": "The meal to predict the glucose response for.",
+            "minItems": 1,
             "maxItems": 100,
             "type": "array",
             "items": {
@@ -3171,6 +4033,8 @@
           "publicName": "cgm_data",
           "schema": {
             "description": "Optional CGM history, to personalize the prediction to this end user. Send it together with `consumed_foods` covering the same period — **at least 5 complete days of paired history**, which is what the model needs to train on them. Fewer is refused with `invalid_request`. Omit both fields for a standard prediction, which needs no sensor and no history.",
+            "minItems": 1,
+            "maxItems": 5000,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CgmReading"
@@ -3183,6 +4047,8 @@
           "publicName": "consumed_foods",
           "schema": {
             "description": "The meals eaten during the CGM history; requires cgm_data.",
+            "minItems": 1,
+            "maxItems": 5000,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConsumedHistoricalFood"
@@ -3213,7 +4079,9 @@
     ],
     "retryAmbiguousNever": [
       "createClientToken",
-      "createFoodLog"
+      "createFoodLog",
+      "createWaterLog",
+      "createWeightLog"
     ]
   }
 }

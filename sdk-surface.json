@@ -122,6 +122,36 @@
       "audience": "shared"
     },
     {
+      "operationId": "createWaterLog",
+      "resource": "water_logs",
+      "method": "create",
+      "audience": "shared"
+    },
+    {
+      "operationId": "listWaterLogs",
+      "resource": "water_logs",
+      "method": "list",
+      "audience": "shared"
+    },
+    {
+      "operationId": "deleteWaterLog",
+      "resource": "water_logs",
+      "method": "delete",
+      "audience": "shared"
+    },
+    {
+      "operationId": "createWeightLog",
+      "resource": "weight_logs",
+      "method": "create",
+      "audience": "shared"
+    },
+    {
+      "operationId": "listWeightLogs",
+      "resource": "weight_logs",
+      "method": "list",
+      "audience": "shared"
+    },
+    {
       "operationId": "predictGlucose",
       "resource": "glucose",
       "method": "predict",
