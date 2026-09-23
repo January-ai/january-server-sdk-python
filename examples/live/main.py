@@ -23,7 +23,13 @@ from uuid import uuid4
 import httpx
 from image_cases import VALID_CASES, photo_case
 
-from januaryai import AsyncJanuary, January, JanuaryAPIError, JanuaryTimeoutError
+from januaryai import (
+    AsyncJanuary,
+    January,
+    JanuaryAPIError,
+    JanuaryTimeoutError,
+    JanuaryValidationError,
+)
 from januaryai.models import FoodLogInputFoodInput
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -217,6 +223,8 @@ class Reporter:
         duration: float = 0,
         cleanup: bool = False,
         reason: str | None = None,
+        end_user_id: str | None = None,
+        at: str | None = None,
     ) -> dict[str, Any]:
         row = {
             "mode": mode,
@@ -231,10 +239,12 @@ class Reporter:
         }
         if reason is not None:
             row["reason"] = reason  # All callers supply static dependency labels only.
+        if end_user_id is not None:
+            # Only on a write the runner could not clean up, so it can be removed server-side.
+            row["endUserId"], row["at"] = end_user_id, at
         self.results.append(row)
-        self.emit(
-            json.dumps({k: row[k] for k in ("mode", "operation", "status", "code", "requestId")})
-        )
+        keys = ("mode", "operation", "status", "code", "requestId", "endUserId", "at")
+        self.emit(json.dumps({k: row[k] for k in keys if k in row}))
         return row
 
     def remaining(self, reason: str) -> None:
@@ -271,7 +281,7 @@ class Reporter:
         passed = (
             len(operations) == len(OPERATIONS) * len(self.modes)
             and counts["PASS"] == len(operations)
-            and all(r["status"] == "PASS" for r in self.results)
+            and all(r["status"] == "PASS" for r in self.results if r["kind"] != "retained")
         )
         return {
             "language": "python",
@@ -288,6 +298,22 @@ class Reporter:
             "durationMs": round((time.monotonic() - self.started) * 1000, 2),
             "results": self.results,
         }
+
+
+RUN_USER_PREFIX = "sdk-e2e-python-"
+
+
+def create_outcome_unknown(error: BaseException) -> bool:
+    """Whether a failed create may still have been recorded.
+
+    Local validation errors and 4xx replies are definitive rejections; a transport
+    error, timeout, 5xx reply, or malformed success reply leaves the outcome unknown.
+    """
+    if isinstance(error, (JanuaryValidationError, CheckFailed)):
+        return False
+    if isinstance(error, JanuaryAPIError):
+        return error.status_code >= 500
+    return True
 
 
 async def invoke(fn: Callable[..., Any], **kwargs: Any) -> Any:
@@ -356,7 +382,7 @@ async def token_probe(config: Config, token: str, mode: str) -> Any:
 async def workflow(
     config: Config, mode: str, report: Reporter, *, image_matrix: bool = False
 ) -> None:
-    user_id = f"sdk-e2e-python-{uuid4()}"  # Always fresh; no existing-user override.
+    user_id = f"{RUN_USER_PREFIX}{uuid4()}"  # Always fresh; no existing-user override.
     marker = f"January SDK E2E {uuid4()}"
     report.secrets.update((user_id, marker))
     client = (AsyncJanuary if mode == "async" else January)(
@@ -367,6 +393,11 @@ async def workflow(
     date_range = {"start": started.date().isoformat(), "end": started.date().isoformat()}
     owned_logs: set[str] = set()
     owned_water_logs: set[str] = set()
+    # Writes the runner cannot clean up: a water log is deletable only by the ID its
+    # create returns (the list endpoint returns daily totals), and a weight log cannot
+    # be deleted at all. Each is reported with the run's user and time.
+    unconfirmed: list[tuple[str, str]] = []
+    logged_at = started.isoformat().replace("+00:00", "Z")
     create_attempted = False
     create_acknowledged = False
     mint_attempted = False
@@ -591,13 +622,21 @@ async def workflow(
         )
 
         async def create_water_log() -> Any:
-            entry = await invoke(
-                user.water_logs.create,
-                amount={"value": 250, "unit": "ml"},
-                consumed_at=started,
-            )
+            unconfirmed_water = ("cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed")
+            try:
+                entry = await invoke(
+                    user.water_logs.create,
+                    amount={"value": 250, "unit": "ml"},
+                    consumed_at=started,
+                )
+            except Exception as error:
+                if create_outcome_unknown(error):
+                    unconfirmed.append(unconfirmed_water)
+                raise
             if isinstance(entry.id, str) and entry.id:
                 owned_water_logs.add(entry.id)
+            else:
+                unconfirmed.append(unconfirmed_water)
             require(bool(entry.id), "missing_created_water_log_id")
             require(
                 entry.amount.unit == "ml" and entry.amount.value == 250, "water_amount_mismatch"
@@ -618,11 +657,33 @@ async def workflow(
                 any(item.total.value >= 250 for item in r.items), "water_total_missing_created_log"
             ),
         )
+
+        async def create_weight_log() -> Any:
+            # Weight logs have no delete endpoint. The runner creates one only for its
+            # own synthetic end user, where it stays; the report lists it as retained.
+            require(user_id.startswith(RUN_USER_PREFIX), "not_a_run_owned_user")
+            try:
+                entry = await invoke(
+                    user.weight_logs.create, weight={"value": 65, "unit": "kg"}, measured_at=started
+                )
+            except Exception as error:
+                if create_outcome_unknown(error):
+                    unconfirmed.append(
+                        ("cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed")
+                    )
+                raise
+            report.record(
+                mode,
+                "weight_logs.create",
+                "RETAINED",
+                kind="retained",
+                code="no_delete_endpoint_run_user_only",
+            )
+            return entry
+
         await step(
             "weight_logs.create",
-            lambda: user.weight_logs.create(
-                weight={"value": 65, "unit": "kg"}, measured_at=started
-            ),
+            create_weight_log,
             validate=lambda r: require(
                 r.weight.unit == "kg" and r.weight.value == 65, "weight_mismatch"
             ),
@@ -749,6 +810,17 @@ async def workflow(
                 )
                 if deleted is not None:
                     owned_water_logs.discard(water_id)
+            for label, code in unconfirmed:
+                report.record(
+                    mode,
+                    label,
+                    "FAIL",
+                    kind="cleanup",
+                    code=code,
+                    cleanup=True,
+                    end_user_id=user_id,
+                    at=logged_at,
+                )
         finally:
             try:
                 await step(

@@ -58,8 +58,10 @@ def synthetic_environment(root):
 
 
 @contextmanager
-def service(fail=None, revoke_count=1, hide_logs=False):
+def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=()):
     state = {
+        "drop": set(drop),
+        "reject": set(reject),
         "requests": [],
         "logs": {},
         "water": {},
@@ -234,6 +236,16 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"]["revoked_count"] = revoke_count
             if auth and auth.startswith("Bearer ct-"):
                 assert auth[7:] in state["tokens"].values()
+            if op in state["drop"]:
+                # The write is recorded, then the connection closes before any reply.
+                self.close_connection = True
+                return
+            if op in state["reject"]:
+                response = {
+                    "status": 400,
+                    "headers": {"x-request-id": "req-safe"},
+                    "body": {"code": "daily_water_limit_exceeded", "message": "over the cap"},
+                }
             if op in state["fail"]:
                 response = {
                     "status": 503,
@@ -469,6 +481,79 @@ def test_cleanup_failures_fail_run_and_do_not_retry_or_loop(tmp_path):
         code, report, _ = run(tmp_path, state, "sync")
         assert code == 0
         assert len(state["revocations"]) == 1
+
+
+def unconfirmed_rows(report, state, operation, code):
+    rows = [r for r in report["results"] if r["operation"] == operation]
+    assert len(rows) == 1, report["results"]
+    row = rows[0]
+    assert row["status"] == "FAIL" and row["code"] == code and row["cleanup"]
+    assert row["endUserId"] in state["users"]
+    assert re.fullmatch(r"sdk-e2e-python-[0-9a-f-]{36}", row["endUserId"])
+    logged = datetime.fromisoformat(row["at"].replace("Z", "+00:00"))
+    assert abs((datetime.now(UTC) - logged).total_seconds()) < 60
+    assert report["status"] == "FAIL" and report["cleanupFailures"] >= 1
+    return row
+
+
+@pytest.mark.parametrize("failure", ["drop", "fail"])
+def test_water_create_without_a_usable_reply_names_the_user_and_time(tmp_path, failure):
+    # The list endpoint returns daily totals, so an unreturned water log ID is unrecoverable.
+    fake = (
+        service(drop={"createWaterLog"})
+        if failure == "drop"
+        else service(fail={"createWaterLog": True})
+    )
+    with fake as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert rows["water_logs.delete"]["status"] == "BLOCKED"
+        assert sum(r["operation"] == "createWaterLog" for r in state["requests"]) == 1
+        row = unconfirmed_rows(
+            report, state, "cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed"
+        )
+        assert row["endUserId"] in output and row["at"] in output
+
+
+def test_rejected_water_create_needs_no_cleanup(tmp_path):
+    with service(reject={"createWaterLog"}) as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert report["cleanupFailures"] == 0
+        assert not any("endUserId" in r for r in report["results"])
+        assert all(user not in output for user in state["users"])
+
+
+@pytest.mark.parametrize("failure", ["drop", "fail"])
+def test_weight_create_without_a_usable_reply_names_the_user_and_time(tmp_path, failure):
+    fake = (
+        service(drop={"createWeightLog"})
+        if failure == "drop"
+        else service(fail={"createWeightLog": True})
+    )
+    with fake as state:
+        code, report, _output = run(tmp_path, state, "async")
+        assert code == 1
+        assert not [r for r in report["results"] if r["kind"] == "retained"]
+        unconfirmed_rows(
+            report, state, "cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed"
+        )
+
+
+def test_weight_logs_are_retained_on_the_run_user_only(tmp_path):
+    with service() as state:
+        code, report, _output = run(tmp_path, state)
+        assert code == 0
+        retained = [r for r in report["results"] if r["kind"] == "retained"]
+        assert [(r["mode"], r["operation"], r["status"], r["code"]) for r in retained] == [
+            ("sync", "weight_logs.create", "RETAINED", "no_delete_endpoint_run_user_only"),
+            ("async", "weight_logs.create", "RETAINED", "no_delete_endpoint_run_user_only"),
+        ]
+        assert set(state["weights"]) == state["users"]
 
 
 def test_report_sanitizes_error_metadata(tmp_path):
