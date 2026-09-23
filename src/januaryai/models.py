@@ -190,7 +190,7 @@ class CreateClientTokenBodyInput(TypedDict, total=False):
 class CreateFoodLogBody(APIModel):
     "CreateFoodLogBody: typed API data. Unknown response fields are preserved."
     foods: list[FoodLogInputFood] = Field(..., alias="foods", repr=False)
-    eaten_at: datetime | None = Field(default=None, alias="eaten_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
+    eaten_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
     name: str | None = Field(default=None, alias="name", repr=False)
 
 class CreateFoodLogBodyInput(TypedDict, total=False):
@@ -201,7 +201,7 @@ class CreateFoodLogBodyInput(TypedDict, total=False):
 class CreateWaterLogBody(APIModel):
     "CreateWaterLogBody: typed API data. Unknown response fields are preserved."
     amount: WaterAmount = Field(..., alias="amount", repr=False, description="How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.")
-    consumed_at: datetime | None = Field(default=None, alias="consumed_at", repr=False, description="When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.")
+    consumed_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.")
 
 class CreateWaterLogBodyInput(TypedDict, total=False):
     amount: Required[WaterAmount | WaterAmountInput]
@@ -210,7 +210,7 @@ class CreateWaterLogBodyInput(TypedDict, total=False):
 class CreateWeightLogBody(APIModel):
     "CreateWeightLogBody: typed API data. Unknown response fields are preserved."
     weight: Weight = Field(..., alias="weight", repr=False, description="The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.")
-    measured_at: datetime | None = Field(default=None, alias="measured_at", repr=False, description="When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
+    measured_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
 
 class CreateWeightLogBodyInput(TypedDict, total=False):
     weight: Required[Weight | WeightInput]
@@ -247,7 +247,7 @@ class DailyWaterTotalInput(TypedDict, total=False):
 class DailyWeight(APIModel):
     "DailyWeight: typed API data. Unknown response fields are preserved."
     date: _date = Field(..., alias="date", repr=False, description="Local calendar date in the request’s `timezone`.")
-    weight: Weight = Field(..., alias="weight", repr=False, description="The weight with the latest `measured_at` on this day — later measurements replace earlier ones — in the unit it was logged in.")
+    weight: Weight = Field(..., alias="weight", repr=False, description="The weight with the latest `created_at` on this day — later measurements replace earlier ones — in the unit it was logged in.")
 
 class DailyWeightInput(TypedDict, total=False):
     date: Required[str | _date | datetime]
@@ -292,7 +292,7 @@ class FoodLog(APIModel):
     "FoodLog: typed API data. Unknown response fields are preserved."
     id: str | None = Field(..., alias="id", repr=False, description="Save this id to update or delete the log. Null only when the upstream sent a log with no id — such a log cannot be addressed.")
     foods: list[LoggedFood] = Field(..., alias="foods", repr=False)
-    eaten_at: datetime = Field(..., alias="eaten_at", repr=False, description="When the meal was eaten. UTC, with milliseconds.")
+    eaten_at: datetime = Field(..., alias="created_at", repr=False, description="When the meal was eaten. UTC, with milliseconds.")
     name: str | None = Field(..., alias="name", repr=False, description="Null when no name was given.")
 
 class FoodLogInput(TypedDict, total=False):
@@ -746,7 +746,7 @@ class SuggestFoodAlternativesResponseInput(TypedDict, total=False):
 class UpdateFoodLogBody(APIModel):
     "UpdateFoodLogBody: typed API data. Unknown response fields are preserved."
     foods: list[FoodLogInputFood] | None = Field(default=None, alias="foods", repr=False)
-    eaten_at: datetime | None = Field(default=None, alias="eaten_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.")
+    eaten_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.")
     name: str | None = Field(default=None, alias="name", repr=False)
 
 class UpdateFoodLogBodyInput(TypedDict, total=False):
@@ -765,7 +765,7 @@ class VolumeInput(TypedDict, total=False):
 
 class WaterAmount(APIModel):
     "WaterAmount: typed API data. Unknown response fields are preserved."
-    value: float = Field(..., alias="value", repr=False, description="Accepted range depends on unit: 1–811.5 fl_oz, 0.125–101.4 cup, 30–24000 ml.")
+    value: float = Field(..., alias="value", repr=False, description="Accepted range depends on unit: 1–811.5 fl_oz, 30–24000 ml, 0.1–101.4 cup.")
     unit: VolumeUnit = Field(..., alias="unit", repr=False)
 
 class WaterAmountInput(TypedDict, total=False):
@@ -776,7 +776,7 @@ class WaterLog(APIModel):
     "WaterLog: typed API data. Unknown response fields are preserved."
     id: str = Field(..., alias="id", repr=False, description="Save this id to delete the log.")
     amount: WaterAmount = Field(..., alias="amount", repr=False, description="The amount as logged, in the unit it was sent in.")
-    consumed_at: datetime = Field(..., alias="consumed_at", repr=False, description="When the water was consumed. UTC, with milliseconds.")
+    consumed_at: datetime = Field(..., alias="created_at", repr=False, description="When the water was consumed. UTC, with milliseconds.")
 
 class WaterLogInput(TypedDict, total=False):
     id: Required[str]
@@ -795,7 +795,7 @@ class WeightInput(TypedDict, total=False):
 class WeightLog(APIModel):
     "WeightLog: typed API data. Unknown response fields are preserved."
     weight: Weight = Field(..., alias="weight", repr=False, description="The weight as logged, in the unit it was sent in.")
-    measured_at: datetime = Field(..., alias="measured_at", repr=False, description="When the weight was measured. UTC, with milliseconds.")
+    measured_at: datetime = Field(..., alias="created_at", repr=False, description="When the weight was measured. UTC, with milliseconds.")
 
 class WeightLogInput(TypedDict, total=False):
     weight: Required[Weight | WeightInput]

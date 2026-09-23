@@ -1232,11 +1232,12 @@
             "$ref": "#/components/schemas/FoodLogInputFood"
           }
         },
-        "eaten_at": {
+        "created_at": {
           "type": "string",
           "example": "2024-09-13T11:34:56Z",
           "format": "date-time",
-          "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+          "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.",
+          "x-january-public-name": "eatenAt"
         },
         "name": {
           "type": "string",
@@ -1336,11 +1337,12 @@
             "$ref": "#/components/schemas/LoggedFood"
           }
         },
-        "eaten_at": {
+        "created_at": {
           "type": "string",
           "example": "2024-09-13T11:34:56.000Z",
           "format": "date-time",
-          "description": "When the meal was eaten. UTC, with milliseconds."
+          "description": "When the meal was eaten. UTC, with milliseconds.",
+          "x-january-public-name": "eatenAt"
         },
         "name": {
           "type": "string",
@@ -1352,7 +1354,7 @@
       "required": [
         "id",
         "foods",
-        "eaten_at",
+        "created_at",
         "name"
       ],
       "x-january-upstream-schema": "FoodLog"
@@ -1538,11 +1540,12 @@
             "$ref": "#/components/schemas/FoodLogInputFood"
           }
         },
-        "eaten_at": {
+        "created_at": {
           "type": "string",
           "example": "2024-09-13T11:34:56Z",
           "format": "date-time",
-          "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged."
+          "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.",
+          "x-january-public-name": "eatenAt"
         },
         "name": {
           "type": "string",
@@ -1560,12 +1563,9 @@
         "value": {
           "type": "number",
           "example": 8,
-          "minimum": 0.125,
+          "minimum": 0.1,
           "maximum": 24000,
-          "description": "Accepted range depends on unit: 1–811.5 fl_oz, 0.125–101.4 cup, 30–24000 ml.",
-          "x-january-derived-from": "/components/schemas/WaterAmount/properties/value",
-          "x-january-overlay-id": "NORMALIZATION-079",
-          "x-january-evidence": "EVIDENCE-014"
+          "description": "Accepted range depends on unit: 1–811.5 fl_oz, 30–24000 ml, 0.1–101.4 cup."
         },
         "unit": {
           "$ref": "#/components/schemas/VolumeUnit"
@@ -1589,7 +1589,7 @@
             "maximum": 24000
           },
           "cup": {
-            "minimum": 0.125,
+            "minimum": 0.1,
             "maximum": 101.4
           }
         }
@@ -1609,11 +1609,12 @@
             }
           ]
         },
-        "consumed_at": {
+        "created_at": {
           "type": "string",
           "example": "2026-09-10T07:30:00-07:00",
           "format": "date-time",
-          "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against."
+          "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.",
+          "x-january-public-name": "consumedAt"
         }
       },
       "required": [
@@ -1637,17 +1638,18 @@
             }
           ]
         },
-        "consumed_at": {
+        "created_at": {
           "type": "string",
           "example": "2026-09-10T14:30:00.000Z",
           "format": "date-time",
-          "description": "When the water was consumed. UTC, with milliseconds."
+          "description": "When the water was consumed. UTC, with milliseconds.",
+          "x-january-public-name": "consumedAt"
         }
       },
       "required": [
         "id",
         "amount",
-        "consumed_at"
+        "created_at"
       ],
       "x-january-upstream-schema": "WaterLog"
     },
@@ -1775,11 +1777,12 @@
           "x-january-overlay-id": "NORMALIZATION-084",
           "x-january-evidence": "EVIDENCE-015"
         },
-        "measured_at": {
+        "created_at": {
           "type": "string",
           "example": "2026-09-10T07:30:00-07:00",
           "format": "date-time",
-          "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+          "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.",
+          "x-january-public-name": "measuredAt"
         }
       },
       "required": [
@@ -1798,16 +1801,17 @@
             }
           ]
         },
-        "measured_at": {
+        "created_at": {
           "type": "string",
           "example": "2026-09-10T14:30:00.000Z",
           "format": "date-time",
-          "description": "When the weight was measured. UTC, with milliseconds."
+          "description": "When the weight was measured. UTC, with milliseconds.",
+          "x-january-public-name": "measuredAt"
         }
       },
       "required": [
         "weight",
-        "measured_at"
+        "created_at"
       ],
       "x-january-upstream-schema": "WeightLog"
     },
@@ -1821,7 +1825,7 @@
           "description": "Local calendar date in the request’s `timezone`."
         },
         "weight": {
-          "description": "The weight with the latest `measured_at` on this day — later measurements replace earlier ones — in the unit it was logged in.",
+          "description": "The weight with the latest `created_at` on this day — later measurements replace earlier ones — in the unit it was logged in.",
           "allOf": [
             {
               "$ref": "#/components/schemas/Weight"
@@ -2358,11 +2362,7 @@
         "/components/schemas/Volume/properties/unit",
         "/paths/~1v1.2~1water-logs/get/parameters/4/schema"
       ],
-      "x-january-overlay-id": "NORMALIZATION-068",
-      "x-january-patch-overlay-ids": [
-        "NORMALIZATION-078"
-      ],
-      "x-january-evidence": "EVIDENCE-014"
+      "x-january-overlay-id": "NORMALIZATION-068"
     },
     "NutrientUnit": {
       "type": "string",
@@ -3253,13 +3253,14 @@
           "required": true
         },
         {
-          "name": "eaten_at",
+          "name": "created_at",
           "publicName": "eaten_at",
           "schema": {
             "type": "string",
             "example": "2024-09-13T11:34:56Z",
             "format": "date-time",
-            "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+            "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.",
+            "x-january-public-name": "eatenAt"
           },
           "required": false
         },
@@ -3554,13 +3555,14 @@
           "required": false
         },
         {
-          "name": "eaten_at",
+          "name": "created_at",
           "publicName": "eaten_at",
           "schema": {
             "type": "string",
             "example": "2024-09-13T11:34:56Z",
             "format": "date-time",
-            "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged."
+            "description": "When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.",
+            "x-january-public-name": "eatenAt"
           },
           "required": false
         },
@@ -3671,13 +3673,14 @@
           "required": true
         },
         {
-          "name": "consumed_at",
+          "name": "created_at",
           "publicName": "consumed_at",
           "schema": {
             "type": "string",
             "example": "2026-09-10T07:30:00-07:00",
             "format": "date-time",
-            "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against."
+            "description": "When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.",
+            "x-january-public-name": "consumedAt"
           },
           "required": false
         }
@@ -3876,13 +3879,14 @@
           "required": true
         },
         {
-          "name": "measured_at",
+          "name": "created_at",
           "publicName": "measured_at",
           "schema": {
             "type": "string",
             "example": "2026-09-10T07:30:00-07:00",
             "format": "date-time",
-            "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now."
+            "description": "When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.",
+            "x-january-public-name": "measuredAt"
           },
           "required": false
         }
