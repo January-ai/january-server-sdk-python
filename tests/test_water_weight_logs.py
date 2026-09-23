@@ -432,6 +432,34 @@ def test_weight_range_errors_name_the_endpoint_range() -> None:
     assert "weight.value must be from 1 through 700 kg" in str(result)
 
 
+@pytest.mark.parametrize(
+    "unit,accepted,refused",
+    [
+        ("in", (20, 65, 108), (19.9, 108.1, 200, 275)),
+        ("cm", (50, 175, 275), (20, 49.9, 275.1)),
+    ],
+)
+def test_a_glucose_profile_height_must_be_within_its_units_range(
+    unit: str, accepted: tuple[float, ...], refused: tuple[float, ...]
+) -> None:
+    captured, handler = recorder(200, BY_ID["predictGlucose"]["response"]["body"])
+
+    def predict(value: float) -> Any:
+        kwargs = weight_kwargs("glucose.predict", 70, "kg")
+        kwargs["user_profile"]["height"] = {"value": value, "unit": unit}
+        return exercise("sync", handler, "glucose.predict", kwargs=kwargs, user=None)
+
+    for value in accepted:
+        before = len(captured)
+        assert not isinstance(predict(value), JanuaryError) and len(captured) == before + 1
+    for value in refused:
+        result = predict(value)
+        assert isinstance(result, JanuaryValidationError), value
+    assert len(captured) == len(accepted)
+    if unit == "in":
+        assert "height.value must be from 20 through 108 in" in str(predict(200))
+
+
 def test_a_food_quantity_must_be_greater_than_zero() -> None:
     captured, handler = recorder(201, BY_ID["createFoodLog"]["response"]["body"])
     food = {"food_id": "84222716", "serving_id": "67943292"}
