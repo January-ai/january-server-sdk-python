@@ -175,7 +175,9 @@ def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=()):
                 response["body"] = deepcopy(state["logs"][user][log_id])
             if op == "deleteFoodLog" and op not in state["fail"]:
                 state["logs"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
-            if op == "createWaterLog":
+            # A rejected create records nothing. A failed or dropped one is recorded
+            # first, the way a server that commits before replying would.
+            if op == "createWaterLog" and op not in state["reject"]:
                 assert body is not None
                 entry = response["body"]
                 entry.update(id=str(uuid4()), amount=body["amount"])
@@ -204,7 +206,7 @@ def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=()):
                 }
             if op == "deleteWaterLog" and op not in state["fail"]:
                 state["water"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
-            if op == "createWeightLog":
+            if op == "createWeightLog" and op not in state["reject"]:
                 assert body is not None
                 response["body"].update(weight=body["weight"])
                 state["weights"].setdefault(user, []).append(deepcopy(response["body"]))
@@ -521,10 +523,26 @@ def test_rejected_water_create_needs_no_cleanup(tmp_path):
     with service(reject={"createWaterLog"}) as state:
         code, report, output = run(tmp_path, state, "sync")
         assert code == 1
+        # A definitive rejection records nothing, so there is nothing to clean up.
+        assert sum(r["operation"] == "createWaterLog" for r in state["requests"]) == 1
+        assert not any(state["water"].values())
         rows = {r["operation"]: r for r in report["results"]}
         assert rows["water_logs.create"]["status"] == "FAIL"
+        assert rows["water_logs.delete"]["status"] == "BLOCKED"
         assert report["cleanupFailures"] == 0
         assert not any("endUserId" in r for r in report["results"])
+        assert all(user not in output for user in state["users"])
+
+
+def test_rejected_weight_create_is_neither_retained_nor_unconfirmed(tmp_path):
+    with service(reject={"createWeightLog"}) as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        assert not any(state["weights"].values())
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["weight_logs.create"]["status"] == "FAIL"
+        assert not [r for r in report["results"] if r["kind"] == "retained"]
+        assert report["cleanupFailures"] == 0
         assert all(user not in output for user in state["users"])
 
 
