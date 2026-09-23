@@ -672,6 +672,12 @@ async def workflow(
                         ("cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed")
                     )
                 raise
+            # A success reply the runner cannot confirm leaves the weight's state unknown.
+            if not (entry.weight.unit == "kg" and entry.weight.value == 65):
+                unconfirmed.append(
+                    ("cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed")
+                )
+                raise CheckFailed("weight_mismatch")
             report.record(
                 mode,
                 "weight_logs.create",
@@ -681,13 +687,7 @@ async def workflow(
             )
             return entry
 
-        await step(
-            "weight_logs.create",
-            create_weight_log,
-            validate=lambda r: require(
-                r.weight.unit == "kg" and r.weight.value == 65, "weight_mismatch"
-            ),
-        )
+        await step("weight_logs.create", create_weight_log)
         await step(
             "weight_logs.list",
             lambda: user.weight_logs.list(

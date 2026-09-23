@@ -58,8 +58,9 @@ def synthetic_environment(root):
 
 
 @contextmanager
-def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=()):
+def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=(), malformed=()):
     state = {
+        "malformed": set(malformed),
         "drop": set(drop),
         "reject": set(reject),
         "requests": [],
@@ -210,6 +211,9 @@ def service(fail=None, revoke_count=1, hide_logs=False, drop=(), reject=()):
                 assert body is not None
                 response["body"].update(weight=body["weight"])
                 state["weights"].setdefault(user, []).append(deepcopy(response["body"]))
+                if op in state["malformed"]:
+                    # Recorded, but the success reply does not match what was sent.
+                    response["body"] = {**response["body"], "weight": {"value": 66, "unit": "kg"}}
             if op == "listWeightLogs":
                 query = parse_qs(location.query)
                 latest = state["weights"].get(user, [])
@@ -546,13 +550,13 @@ def test_rejected_weight_create_is_neither_retained_nor_unconfirmed(tmp_path):
         assert all(user not in output for user in state["users"])
 
 
-@pytest.mark.parametrize("failure", ["drop", "fail"])
+@pytest.mark.parametrize("failure", ["drop", "fail", "malformed"])
 def test_weight_create_without_a_usable_reply_names_the_user_and_time(tmp_path, failure):
-    fake = (
-        service(drop={"createWeightLog"})
-        if failure == "drop"
-        else service(fail={"createWeightLog": True})
-    )
+    fake = {
+        "drop": lambda: service(drop={"createWeightLog"}),
+        "fail": lambda: service(fail={"createWeightLog": True}),
+        "malformed": lambda: service(malformed={"createWeightLog"}),
+    }[failure]()
     with fake as state:
         code, report, _output = run(tmp_path, state, "async")
         assert code == 1
