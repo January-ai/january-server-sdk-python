@@ -366,6 +366,72 @@ def test_water_amount_range_error_names_the_unit_range() -> None:
     assert "amount.value must be from 1 through 811.5 fl_oz" in str(result)
 
 
+WEIGHT_RANGE_CASES = [
+    # Weight is shared: a glucose profile takes 2 to 1500 lb or 1 to 700 kg, and a
+    # weight-log request narrows that to 10 to 1000 lb or 4.5 to 453.6 kg.
+    ("weight_logs.create", "lb", (10, 150, 1000), (2, 9.99, 1000.1, 1500)),
+    ("weight_logs.create", "kg", (4.5, 70, 453.6), (1, 4.49, 453.7, 700)),
+    ("glucose.predict", "lb", (2, 9.99, 1000.1, 1500), (1, 1.99, 1500.1)),
+    ("glucose.predict", "kg", (1, 4.49, 453.7, 700), (0.99, 700.1, 1000)),
+]
+
+
+def weight_kwargs(operation: str, value: float, unit: str) -> dict[str, Any]:
+    weight = {"value": value, "unit": unit}
+    if operation == "weight_logs.create":
+        return {"weight": weight}
+    return {
+        "user_profile": {
+            "age": 30,
+            "sex": "male",
+            "height": {"value": 175, "unit": "cm"},
+            "weight": weight,
+        },
+        "timezone": "UTC",
+        "foods": [{"food_id": "84222716", "serving_id": "67943292", "quantity": 1}],
+        "start_time": "2026-09-10T12:00:00Z",
+    }
+
+
+@pytest.mark.parametrize("operation,unit,accepted,refused", WEIGHT_RANGE_CASES)
+def test_a_weight_must_be_within_the_range_of_its_unit_and_endpoint(
+    operation: str, unit: str, accepted: tuple[float, ...], refused: tuple[float, ...]
+) -> None:
+    fixture = BY_ID["createWeightLog" if operation.startswith("weight") else "predictGlucose"]
+    status = 201 if operation.startswith("weight") else 200
+    captured, handler = recorder(status, fixture["response"]["body"])
+    user = "water-user" if operation.startswith("weight") else None
+    for value in accepted:
+        before = len(captured)
+        result = exercise(
+            "sync", handler, operation, kwargs=weight_kwargs(operation, value, unit), user=user
+        )
+        assert not isinstance(result, JanuaryError) and len(captured) == before + 1, value
+    for value in refused:
+        result = exercise(
+            "sync", handler, operation, kwargs=weight_kwargs(operation, value, unit), user=user
+        )
+        assert isinstance(result, JanuaryValidationError), value
+    assert len(captured) == len(accepted)
+
+
+def test_weight_range_errors_name_the_endpoint_range() -> None:
+    _captured, handler = recorder(201, BY_ID["createWeightLog"]["response"]["body"])
+    result = exercise(
+        "sync", handler, "weight_logs.create", kwargs=weight_kwargs("weight_logs.create", 700, "kg")
+    )
+    assert "weight.value must be from 4.5 through 453.6 kg" in str(result)
+    _captured, handler = recorder(200, BY_ID["predictGlucose"]["response"]["body"])
+    result = exercise(
+        "sync",
+        handler,
+        "glucose.predict",
+        kwargs=weight_kwargs("glucose.predict", 1000, "kg"),
+        user=None,
+    )
+    assert "weight.value must be from 1 through 700 kg" in str(result)
+
+
 def test_a_food_quantity_must_be_greater_than_zero() -> None:
     captured, handler = recorder(201, BY_ID["createFoodLog"]["response"]["body"])
     food = {"food_id": "84222716", "serving_id": "67943292"}

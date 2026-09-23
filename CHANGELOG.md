@@ -14,8 +14,10 @@
   timeout, lost response or 5xx reply), like food-log creation and token minting.
   A 429 `rate_limited` reply recorded nothing, so it is retried within the limits.
 - A water amount must be within its unit's range (1–811.5 `fl_oz`, 0.125–101.4
-  `cup`, 30–24000 `ml`), and a food or serving quantity must be greater than zero.
-  Both raise `JanuaryValidationError` before any request.
+  `cup`, 30–24000 `ml`), a weight log within 10–1000 `lb` or 4.5–453.6 `kg`, a
+  glucose profile's weight within 2–1500 `lb` or 1–700 `kg`, and a food or serving
+  quantity must be greater than zero. These raise `JanuaryValidationError` before
+  any request.
 - `client_tokens.create`, `HttpClientTokenIssuer` and the `ClientScope` type accept
   the new log scopes.
 - A correction input accepts `confidence=None`, which text analyses and corrected
