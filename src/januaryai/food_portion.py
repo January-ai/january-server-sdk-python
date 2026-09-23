@@ -89,7 +89,7 @@ class FoodPortion:
         if selected is None:
             raise FoodPortionError("serving_not_found")
         if (
-            selected.id is None
+            not selected.id
             or not _positive_finite(selected.quantity)
             or not _positive_finite(selected.scaling_factor)
         ):

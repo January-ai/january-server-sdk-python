@@ -700,3 +700,26 @@ def test_client_token_scopes_cover_the_new_logs() -> None:
             scopes=["water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"],
         )
     assert b"water_logs:write" in captured[0].read() and b"weight_logs:read" in captured[0].read()
+
+
+@pytest.mark.parametrize(
+    "food_id,serving_id",
+    [
+        ("0123", "67943292"),
+        ("84222716", "012"),
+        ("12345678901", "67943292"),
+        ("", "1"),
+        ("1", "1a"),
+    ],
+)
+def test_food_and_serving_ids_are_one_to_ten_digits_without_a_leading_zero(
+    food_id: str, serving_id: str
+) -> None:
+    captured, handler = recorder(201, BY_ID["createFoodLog"]["response"]["body"])
+    foods = [{"food_id": food_id, "serving_id": serving_id, "quantity": 1}]
+    result = exercise("sync", handler, "food_logs.create", kwargs={"foods": foods})
+    assert isinstance(result, JanuaryValidationError) and captured == []
+    valid = [{"food_id": "1234567890", "serving_id": "1", "quantity": 1}]
+    assert not isinstance(
+        exercise("sync", handler, "food_logs.create", kwargs={"foods": valid}), JanuaryError
+    )

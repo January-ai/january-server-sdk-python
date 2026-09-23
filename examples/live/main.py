@@ -551,7 +551,7 @@ async def workflow(
         serving = next((s for s in servings if s.is_primary), servings[0] if servings else None)
         selection: list[FoodLogInputFoodInput] | None = (
             [{"food_id": food.id, "serving_id": serving.id, "quantity": 1}]
-            if serving is not None and serving.id is not None and food is not None
+            if serving is not None and food is not None
             else None
         )
 
