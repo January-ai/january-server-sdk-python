@@ -274,7 +274,10 @@ def test_photo_inputs_are_prepared_before_request(mode):
 
 def test_native_timestamps_and_help_keep_wire_contract():
     timestamp = datetime(2026, 8, 31, 12, 30, tzinfo=UTC)
-    log = models.FoodLog(id="log", foods=[], eaten_at=timestamp, name=None)
+    # The wire's created_at is the model's eaten_at.
+    log = models.FoodLog.model_validate(
+        {"id": "log", "foods": [], "created_at": timestamp, "name": None}
+    )
     assert log.eaten_at == timestamp
     reading = models.CgmReading.model_validate_json(
         '{"timestamp":"2026-08-31T12:30:00Z","value":100}'

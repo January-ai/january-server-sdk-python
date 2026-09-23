@@ -121,7 +121,7 @@ def service(
             if op == "createFoodLog":
                 assert body is not None
                 log = response["body"]
-                log.update(id=str(uuid4()), name=body.get("name"), eaten_at=body["eaten_at"])
+                log.update(id=str(uuid4()), name=body.get("name"), created_at=body["created_at"])
                 state["logs"].setdefault(user, {})[log["id"]] = deepcopy(log)
             if op == "listFoodLogs":
                 response["body"] = {"items": list(state["logs"].get(user, {}).values())}
@@ -138,7 +138,9 @@ def service(
                 assert "week_start" not in query, query
                 start = date.fromisoformat(query["start_date"][0])
                 end = date.fromisoformat(query["end_date"][0])
-                eaten_dates = [log["eaten_at"][:10] for log in state["logs"].get(user, {}).values()]
+                eaten_dates = [
+                    log["created_at"][:10] for log in state["logs"].get(user, {}).values()
+                ]
                 buckets = []
                 day = start
                 while day <= end:
@@ -185,11 +187,11 @@ def service(
                 assert body is not None
                 entry = response["body"]
                 # The API returns the stored time in UTC with milliseconds.
-                consumed = datetime.fromisoformat(body["consumed_at"].replace("Z", "+00:00"))
+                consumed = datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
                 entry.update(
                     id=str(uuid4()),
                     amount=body["amount"],
-                    consumed_at=consumed.astimezone(UTC)
+                    created_at=consumed.astimezone(UTC)
                     .isoformat(timespec="milliseconds")
                     .replace("+00:00", "Z"),
                 )
@@ -202,7 +204,7 @@ def service(
                     later = consumed.astimezone(UTC) + timedelta(minutes=1)
                     response["body"] = {
                         **entry,
-                        "consumed_at": later.isoformat(timespec="milliseconds").replace(
+                        "created_at": later.isoformat(timespec="milliseconds").replace(
                             "+00:00", "Z"
                         ),
                     }
@@ -233,10 +235,10 @@ def service(
             if op == "createWeightLog" and op not in state["reject"]:
                 assert body is not None
                 # The API returns the stored time in UTC with milliseconds.
-                measured = datetime.fromisoformat(body["measured_at"].replace("Z", "+00:00"))
+                measured = datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
                 response["body"].update(
                     weight=body["weight"],
-                    measured_at=measured.astimezone(UTC)
+                    created_at=measured.astimezone(UTC)
                     .isoformat(timespec="milliseconds")
                     .replace("+00:00", "Z"),
                 )
@@ -249,7 +251,7 @@ def service(
                     later = measured.astimezone(UTC) + timedelta(minutes=1)
                     response["body"] = {
                         **response["body"],
-                        "measured_at": later.isoformat(timespec="milliseconds").replace(
+                        "created_at": later.isoformat(timespec="milliseconds").replace(
                             "+00:00", "Z"
                         ),
                     }

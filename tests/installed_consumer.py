@@ -9,6 +9,7 @@ import time
 from contextlib import contextmanager, suppress
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.resources import files
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlsplit
 
@@ -17,6 +18,13 @@ from januaryai import AsyncJanuary, FoodPortion, FoodPortionError, January, Resp
 FIXTURES = json.loads(
     Path(__file__).with_name("fixtures").joinpath("contract.json").read_text(encoding="utf-8")
 )
+# The installed package's contract names each parameter and body field. A renamed
+# wire property keeps its public name (created_at is eaten_at on a food log,
+# consumed_at on a water log and measured_at on a weight log), so a keyword is
+# never derived from the wire name.
+OPERATIONS = json.loads(files("januaryai").joinpath("_contract.json").read_text(encoding="utf-8"))[
+    "operations"
+]
 
 
 def snake(value):
@@ -25,12 +33,15 @@ def snake(value):
 
 
 def arguments(fixture):
+    operation = OPERATIONS[fixture["operationId"]]
+    parameters = {item["name"]: item["publicName"] for item in operation["parameters"]}
+    fields = {item["name"]: item["publicName"] for item in operation["fields"]}
     result = {}
     for _kind, params in fixture["request"].get("parameters", {}).items():
         for name, value in params.items():
-            result[snake(fixture.get("parameterNames", {}).get(name, name))] = value
+            result[parameters[name]] = value
     for name, value in fixture["request"].get("body", {}).items():
-        result[snake(fixture.get("bodyPropertyNames", {}).get(name, name))] = value
+        result[fields[name]] = value
     return result
 
 

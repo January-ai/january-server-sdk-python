@@ -284,8 +284,8 @@ def test_unset_null_and_typed_models():
         )
         == {}
     )
-    assert models.FoodLog(
-        id="log", foods=[], eaten_at=datetime(2026, 8, 30, tzinfo=UTC), name=None
+    assert models.FoodLog.model_validate(
+        {"id": "log", "foods": [], "created_at": datetime(2026, 8, 30, tzinfo=UTC), "name": None}
     ).model_dump(exclude_unset=True) == {
         "id": "log",
         "foods": [],
@@ -304,7 +304,7 @@ def test_unset_null_and_typed_models():
             )
             assert service["requests"][-1]["body"] == {
                 "foods": [{"food_id": "12", "serving_id": "5", "quantity": 1}],
-                "eaten_at": "2026-08-30T00:00:00Z",
+                "created_at": "2026-08-30T00:00:00Z",
             }
             with pytest.raises(JanuaryValidationError):
                 client.for_user("user").food_logs.update(log_id="log", name=None)  # pyright: ignore[reportArgumentType] -- intentionally invalid null

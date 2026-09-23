@@ -111,18 +111,67 @@ def test_create_water_log_sends_amount_and_zoned_time(mode: str) -> None:
     assert result.response is not None and result.response.request_id == "req-water"
 
 
+LOG_ID = "78129823-8ba2-4183-b13b-71f0e963c606"
+STORED = "2026-09-10T14:30:15.123Z"
+
+
 @pytest.mark.parametrize("mode", MODES)
-def test_create_water_log_without_time_omits_consumed_at(mode: str) -> None:
+@pytest.mark.parametrize(
+    "operation,kwargs,reply,field",
+    [
+        (
+            "food_logs.create",
+            {"foods": [{"food_id": "84222716", "serving_id": "67943292", "quantity": 1}]},
+            {"id": LOG_ID, "foods": [], "created_at": STORED, "name": None},
+            "eaten_at",
+        ),
+        (
+            "food_logs.update",
+            {"log_id": LOG_ID},
+            {"id": LOG_ID, "foods": [], "created_at": STORED, "name": None},
+            "eaten_at",
+        ),
+        (
+            "water_logs.create",
+            {"amount": {"value": 8, "unit": "fl_oz"}},
+            {"id": LOG_ID, "amount": {"value": 8, "unit": "fl_oz"}, "created_at": STORED},
+            "consumed_at",
+        ),
+        (
+            "weight_logs.create",
+            {"weight": {"value": 70, "unit": "kg"}},
+            {"weight": {"value": 70, "unit": "kg"}, "created_at": STORED},
+            "measured_at",
+        ),
+    ],
+)
+def test_log_times_travel_as_created_at(
+    mode: str, operation: str, kwargs: dict[str, Any], reply: dict[str, Any], field: str
+) -> None:
+    # The API names the time of every log created_at in requests and replies; the
+    # SDK keeps eaten_at, consumed_at and measured_at and maps each to it both ways.
+    captured, handler = recorder(200 if operation.endswith("update") else 201, reply)
+    at = datetime(2026, 9, 10, 14, 30, 15, tzinfo=UTC)
+    result = exercise(mode, handler, operation, kwargs={**kwargs, field: at})
+    body = json.loads(captured[0].read())
+    assert body["created_at"] == "2026-09-10T14:30:15Z"
+    assert not {"eaten_at", "consumed_at", "measured_at"} & body.keys()
+    assert getattr(result, field) == datetime(2026, 9, 10, 14, 30, 15, 123000, tzinfo=UTC)
+    assert "created_at" not in type(result).model_fields
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_create_water_log_without_time_sends_no_time(mode: str) -> None:
     captured, handler = recorder(201, BY_ID["createWaterLog"]["response"]["body"])
     exercise(mode, handler, "water_logs.create", kwargs={"amount": {"value": 300, "unit": "ml"}})
-    assert b"consumed_at" not in captured[0].read()
+    assert json.loads(captured[0].read()) == {"amount": {"value": 300, "unit": "ml"}}
 
 
 @pytest.mark.parametrize("mode", MODES)
 def test_water_logs_accept_cups(mode: str) -> None:
     captured, handler = recorder(201, BY_ID["createWaterLog"]["response"]["body"])
-    exercise(mode, handler, "water_logs.create", kwargs={"amount": {"value": 0.125, "unit": "cup"}})
-    assert b'"amount":{"value":0.125,"unit":"cup"}' in captured[0].read().replace(b" ", b"")
+    exercise(mode, handler, "water_logs.create", kwargs={"amount": {"value": 0.1, "unit": "cup"}})
+    assert b'"amount":{"value":0.1,"unit":"cup"}' in captured[0].read().replace(b" ", b"")
     captured, handler = recorder(200, BY_ID["listWaterLogs"]["response"]["body"])
     exercise(
         mode,
@@ -336,7 +385,7 @@ def test_rate_limited_creates_retry_within_the_budget_and_record_one_log(
     [
         ("fl_oz", (1, 8, 811.5), (0.5, 0.999, 811.51, 1000)),
         ("ml", (30, 250, 24000), (1, 29.9, 24000.01)),
-        ("cup", (0.125, 1, 101.4), (0.124, 101.41, 811.5)),
+        ("cup", (0.1, 0.124, 1, 101.4), (0.099, 101.41, 811.5)),
     ],
 )
 def test_water_amount_must_be_within_its_units_range(
