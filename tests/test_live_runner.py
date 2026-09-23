@@ -184,8 +184,28 @@ def service(
             if op == "createWaterLog" and op not in state["reject"]:
                 assert body is not None
                 entry = response["body"]
-                entry.update(id=str(uuid4()), amount=body["amount"])
+                # The API returns the stored time in UTC with milliseconds.
+                consumed = datetime.fromisoformat(body["consumed_at"].replace("Z", "+00:00"))
+                entry.update(
+                    id=str(uuid4()),
+                    amount=body["amount"],
+                    consumed_at=consumed.astimezone(UTC)
+                    .isoformat(timespec="milliseconds")
+                    .replace("+00:00", "Z"),
+                )
                 state["water"].setdefault(user, {})[entry["id"]] = deepcopy(entry)
+                if op in state["malformed"]:
+                    # Recorded, but the success reply does not match what was sent.
+                    response["body"] = {**entry, "amount": {"value": 251, "unit": "ml"}}
+                if op in state["shifted"]:
+                    # Recorded, but the reply names a different consumption time.
+                    later = consumed.astimezone(UTC) + timedelta(minutes=1)
+                    response["body"] = {
+                        **entry,
+                        "consumed_at": later.isoformat(timespec="milliseconds").replace(
+                            "+00:00", "Z"
+                        ),
+                    }
             if op == "listWaterLogs":
                 query = parse_qs(location.query)
                 unit = query["unit"][0]
@@ -540,6 +560,24 @@ def test_water_create_without_a_usable_reply_names_the_user_and_time(tmp_path, f
             report, state, "cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed"
         )
         assert row["endUserId"] in output and row["at"] in output
+
+
+@pytest.mark.parametrize("failure", ["malformed", "shifted"])
+def test_unverified_water_reply_is_unconfirmed_and_not_deleted(tmp_path, failure):
+    fake = (
+        service(malformed={"createWaterLog"})
+        if failure == "malformed"
+        else service(shifted={"createWaterLog"})
+    )
+    with fake as state:
+        code, report, _output = run(tmp_path, state, "sync")
+        assert code == 1
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert not any(r["operation"] == "deleteWaterLog" for r in state["requests"])
+        unconfirmed_rows(
+            report, state, "cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed"
+        )
 
 
 def test_rejected_water_create_needs_no_cleanup(tmp_path):

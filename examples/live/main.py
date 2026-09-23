@@ -636,14 +636,18 @@ async def workflow(
                 if create_outcome_unknown(error):
                     unconfirmed.append(unconfirmed_water)
                 raise
-            if isinstance(entry.id, str) and entry.id:
-                owned_water_logs.add(entry.id)
-            else:
+            # Delete only an ID whose reply echoes what was sent; any other success leaves
+            # the create unconfirmed, and an unverified ID is never deleted.
+            if not (
+                isinstance(entry.id, str)
+                and entry.id
+                and entry.amount.unit == "ml"
+                and entry.amount.value == 250
+                and entry.consumed_at == started
+            ):
                 unconfirmed.append(unconfirmed_water)
-            require(bool(entry.id), "missing_created_water_log_id")
-            require(
-                entry.amount.unit == "ml" and entry.amount.value == 250, "water_amount_mismatch"
-            )
+                raise CheckFailed("created_water_log_invalid")
+            owned_water_logs.add(entry.id)
             return entry
 
         water = await step("water_logs.create", create_water_log)
