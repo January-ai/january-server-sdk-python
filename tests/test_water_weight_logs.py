@@ -584,6 +584,29 @@ def test_correction_sends_a_returned_scan_back_field_for_field(mode: str) -> Non
     assert detection.food.serving.weight_grams == 81
 
 
+def test_a_stored_scan_without_serving_weight_is_sent_back_for_correction() -> None:
+    """An older stored result may lack weight_grams; the correction input takes it as-is.
+
+    Live responses are decoded against ServingSummary, where the API lists weight_grams
+    as required (null when unknown). A result kept from earlier goes back through
+    CorrectionAnalysis, where it is optional.
+    """
+    stored = json.loads(json.dumps(BY_ID["scanFoodPhoto"]["response"]["body"]))
+    for detection in stored["detections"]:
+        del detection["food"]["serving"]["weight_grams"]
+    correction_fixture = BY_ID["correctPhotoScan"]
+    captured, handler = recorder(200, correction_fixture["response"]["body"])
+    result = exercise(
+        "sync",
+        handler,
+        "food_analysis.correct",
+        kwargs={"analysis": stored, "instruction": "change oatmeal to steel-cut oats"},
+    )
+    assert isinstance(result, models.FoodScan)
+    sent = json.loads(captured[0].read())["analysis"]
+    assert all("weight_grams" not in d["food"]["serving"] for d in sent["detections"])
+
+
 LOG_SCOPES: list[ClientScope] = [
     "water_logs:read",
     "water_logs:write",
