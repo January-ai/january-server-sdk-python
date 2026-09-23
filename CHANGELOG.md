@@ -29,6 +29,14 @@
   the API now documents (`CorrectionAnalysis`); a serving weight is optional there.
 - Logged foods carry the same `ServingSummary` as analysis results, including
   `weight_grams`.
+- `AlternativeFood.id`, `ServingOption.id`, `RestaurantMenuItem.id` and
+  `LoggedFood.food_id` are always returned, so their type is `str` instead of
+  `str | None`. Food and serving IDs must be 1–10 digits without a leading zero;
+  other values raise `JanuaryValidationError` before any request.
+- Photo analysis uses the reasoning-based analyzer when `reasoning` is omitted, as
+  the API now defaults to it. Pass `reasoning={"effort": "none"}` for the standard
+  analyzer. The SDK sends `reasoning` only when you set it.
+- The `conflict` error code (409) is recognized and never retried.
 
 ## 0.1.0 - 2026-09-04
 
