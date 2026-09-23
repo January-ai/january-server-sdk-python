@@ -3,7 +3,7 @@
 import json
 from collections.abc import Callable
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast, get_args
 
 import anyio
 import httpx
@@ -11,15 +11,22 @@ import pytest
 from installed_consumer import FIXTURES
 
 from januaryai import (
+    AsyncHttpClientTokenIssuer,
     AsyncJanuary,
     BadRequestError,
+    ClientScope,
+    CreateClientTokenInput,
+    HttpClientTokenIssuer,
     January,
     JanuaryConnectionError,
     JanuaryError,
     JanuaryValidationError,
+    RateLimitError,
     ResponseMetadata,
     models,
 )
+from januaryai._runtime import Contract
+from januaryai.validation import validate_create_input
 
 KEY = "sk-water-synthetic-0011223344556677"
 MODES = ("sync", "asyncio", "trio")
@@ -218,7 +225,7 @@ def test_user_views_bind_identity_for_the_new_logs(operation: str) -> None:
     fixture = BY_ID["createWaterLog" if operation.startswith("water") else "createWeightLog"]
     captured, handler = recorder(201, fixture["response"]["body"])
     kwargs = (
-        {"amount": {"value": 1, "unit": "ml"}}
+        {"amount": {"value": 250, "unit": "ml"}}
         if operation.startswith("water")
         else {"weight": {"value": 70, "unit": "kg"}}
     )
@@ -246,7 +253,7 @@ def test_user_views_bind_identity_for_the_new_logs(operation: str) -> None:
 @pytest.mark.parametrize(
     "operation,kwargs",
     [
-        ("water_logs.create", {"amount": {"value": 1, "unit": "ml"}}),
+        ("water_logs.create", {"amount": {"value": 250, "unit": "ml"}}),
         ("weight_logs.create", {"weight": {"value": 70, "unit": "kg"}}),
     ],
 )
@@ -280,6 +287,130 @@ def test_new_creates_never_replay_ambiguous_failures(
     attempts.clear()
     result = exercise(mode, rate_limited_then_ok, operation, kwargs=kwargs, max_retries=2)
     assert not isinstance(result, JanuaryError) and attempts == ["429", "429"]
+
+
+@pytest.mark.parametrize("mode", MODES)
+@pytest.mark.parametrize(
+    "operation,kwargs",
+    [
+        ("water_logs.create", {"amount": {"value": 250, "unit": "ml"}}),
+        ("weight_logs.create", {"weight": {"value": 70, "unit": "kg"}}),
+    ],
+)
+def test_rate_limited_creates_retry_within_the_budget_and_record_one_log(
+    mode: str, operation: str, kwargs: dict[str, Any]
+) -> None:
+    """A 429 rate_limited reply is a definitive rejection: nothing was recorded."""
+    fixture = BY_ID["createWaterLog" if operation.startswith("water") else "createWeightLog"]
+    recorded: list[bytes] = []
+    attempts: list[int] = []
+
+    def limited_twice(request: httpx.Request) -> httpx.Response:
+        attempts.append(len(attempts))
+        if len(attempts) <= 2:
+            return httpx.Response(429, json={"code": "rate_limited"}, headers={"retry-after": "0"})
+        recorded.append(request.read())
+        return httpx.Response(201, json=fixture["response"]["body"])
+
+    result = exercise(mode, limited_twice, operation, kwargs=kwargs, max_retries=2)
+    assert not isinstance(result, JanuaryError)
+    assert len(attempts) == 3 and len(recorded) == 1
+
+    for max_retries, retry_after, expected in ((2, "0", 3), (0, "0", 1), (2, "61", 1)):
+        attempts.clear()
+
+        def always_limited(
+            request: httpx.Request, retry_after: str = retry_after
+        ) -> httpx.Response:
+            attempts.append(len(attempts))
+            return httpx.Response(
+                429, json={"code": "rate_limited"}, headers={"retry-after": retry_after}
+            )
+
+        result = exercise(mode, always_limited, operation, kwargs=kwargs, max_retries=max_retries)
+        assert isinstance(result, RateLimitError) and len(attempts) == expected
+
+
+@pytest.mark.parametrize(
+    "unit,accepted,refused",
+    [
+        ("fl_oz", (1, 8, 811.5), (0.5, 0.999, 811.51, 1000)),
+        ("ml", (30, 250, 24000), (1, 29.9, 24000.01)),
+        ("cup", (0.125, 1, 101.4), (0.124, 101.41, 811.5)),
+    ],
+)
+def test_water_amount_must_be_within_its_units_range(
+    unit: str, accepted: tuple[float, ...], refused: tuple[float, ...]
+) -> None:
+    captured, handler = recorder(201, BY_ID["createWaterLog"]["response"]["body"])
+    for value in accepted:
+        before = len(captured)
+        result = exercise(
+            "sync", handler, "water_logs.create", kwargs={"amount": {"value": value, "unit": unit}}
+        )
+        assert not isinstance(result, JanuaryError) and len(captured) == before + 1, value
+    for value in refused:
+        result = exercise(
+            "sync", handler, "water_logs.create", kwargs={"amount": {"value": value, "unit": unit}}
+        )
+        assert isinstance(result, JanuaryValidationError), value
+    assert len(captured) == len(accepted)
+
+
+def test_water_amount_range_error_names_the_unit_range() -> None:
+    _captured, handler = recorder(201, BY_ID["createWaterLog"]["response"]["body"])
+    result = exercise(
+        "sync", handler, "water_logs.create", kwargs={"amount": {"value": 0.5, "unit": "fl_oz"}}
+    )
+    assert isinstance(result, JanuaryValidationError)
+    assert "amount.value must be from 1 through 811.5 fl_oz" in str(result)
+
+
+def test_a_food_quantity_must_be_greater_than_zero() -> None:
+    captured, handler = recorder(201, BY_ID["createFoodLog"]["response"]["body"])
+    food = {"food_id": "84222716", "serving_id": "67943292"}
+    for quantity in (0, -1):
+        result = exercise(
+            "sync", handler, "food_logs.create", kwargs={"foods": [{**food, "quantity": quantity}]}
+        )
+        assert isinstance(result, JanuaryValidationError), quantity
+    assert captured == []
+    result = exercise(
+        "sync", handler, "food_logs.create", kwargs={"foods": [{**food, "quantity": 0.001}]}
+    )
+    assert not isinstance(result, JanuaryError) and len(captured) == 1
+
+
+@pytest.mark.parametrize(
+    "schema,value,valid",
+    [
+        ({"type": "number", "minimum": 0, "exclusiveMinimum": True}, 0, False),
+        ({"type": "number", "minimum": 0, "exclusiveMinimum": True}, 0.001, True),
+        ({"type": "number", "minimum": 0, "exclusiveMinimum": False}, 0, True),
+        ({"type": "number", "maximum": 5, "exclusiveMaximum": True}, 5, False),
+        ({"type": "number", "maximum": 5, "exclusiveMaximum": True}, 4.99, True),
+        ({"type": "integer", "minimum": 1, "exclusiveMinimum": True}, 1, False),
+    ],
+)
+def test_contract_encode_honours_exclusive_bounds(
+    schema: dict[str, Any], value: float, valid: bool
+) -> None:
+    contract = Contract()
+    if valid:
+        assert contract.encode(value, schema, "value") == value
+    else:
+        with pytest.raises(JanuaryValidationError, match="outside the allowed range"):
+            contract.encode(value, schema, "value")
+
+
+@pytest.mark.parametrize("day", ["2026-02-31", "2026-02-29", "2026-04-31", "2026-13-01"])
+def test_impossible_calendar_dates_are_rejected(day: str) -> None:
+    captured, handler = recorder(200, BY_ID["listWaterLogs"]["response"]["body"])
+    kwargs = {"start_date": day, "end_date": day, "timezone": "UTC", "unit": "ml"}
+    result = exercise("sync", handler, "water_logs.list", kwargs=kwargs)
+    assert isinstance(result, JanuaryValidationError) and captured == []
+    leap = {**kwargs, "start_date": "2028-02-29", "end_date": "2028-02-29"}
+    assert not isinstance(exercise("sync", handler, "water_logs.list", kwargs=leap), JanuaryError)
 
 
 @pytest.mark.parametrize("mode", MODES)
@@ -385,6 +516,60 @@ def test_correction_sends_a_returned_scan_back_field_for_field(mode: str) -> Non
     assert json.loads(captured[0].read()) == correction_fixture["request"]["body"]
     detection = result.detections[0]
     assert detection.food.serving.weight_grams == 81
+
+
+LOG_SCOPES: list[ClientScope] = [
+    "water_logs:read",
+    "water_logs:write",
+    "weight_logs:read",
+    "weight_logs:write",
+]
+
+
+def test_client_scope_lists_every_contract_scope() -> None:
+    contract = Contract().data["schemas"]["CreateClientTokenBody"]["properties"]["scopes"]
+    assert list(get_args(ClientScope)) == contract["items"]["enum"]
+    assert len(get_args(ClientScope)) == contract["maxItems"]
+
+
+def test_client_tokens_facade_and_issuers_accept_the_log_scopes() -> None:
+    captured, handler = recorder(201, BY_ID["createClientToken"]["response"]["body"])
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as transport,
+        January(api_key=KEY, http_client=transport, max_retries=0) as client,
+    ):
+        client.client_tokens.create(end_user_id="alice", scopes=LOG_SCOPES)
+        issuer = HttpClientTokenIssuer(secret_key=KEY)
+        issuer._client.close()
+        issuer._client = client
+        issuer.create(CreateClientTokenInput("alice", LOG_SCOPES))
+        every_scope = list(get_args(ClientScope))
+        client.client_tokens.create(end_user_id="alice", scopes=every_scope)
+    assert [json.loads(request.read())["scopes"] for request in captured] == [
+        LOG_SCOPES,
+        LOG_SCOPES,
+        every_scope,
+    ]
+
+    async def run() -> None:
+        async with (
+            httpx.AsyncClient(transport=httpx.MockTransport(handler)) as transport,
+            AsyncJanuary(api_key=KEY, http_client=transport, max_retries=0) as client,
+        ):
+            await client.client_tokens.create(end_user_id="alice", scopes=LOG_SCOPES)
+            issuer = AsyncHttpClientTokenIssuer(secret_key=KEY)
+            await issuer.close()
+            issuer._client = client
+            await issuer.create(CreateClientTokenInput("alice", LOG_SCOPES))
+
+    anyio.run(run)
+    assert [json.loads(request.read())["scopes"] for request in captured[3:]] == [
+        LOG_SCOPES,
+        LOG_SCOPES,
+    ]
+    for scopes in ([], ["sleep_logs:read"], [*get_args(ClientScope), "foods:read"]):
+        with pytest.raises(JanuaryValidationError):
+            validate_create_input(CreateClientTokenInput("alice", cast(Any, scopes)))
 
 
 def test_client_token_scopes_cover_the_new_logs() -> None:

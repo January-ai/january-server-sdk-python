@@ -10,8 +10,16 @@
 - Add weight logs: `weight_logs.create` and `weight_logs.list` (latest weight per day).
 - Add the `water_logs:read`, `water_logs:write`, `weight_logs:read` and
   `weight_logs:write` client-token scopes.
-- Water and weight creation are never replayed after an ambiguous failure, like
-  food-log creation and token minting.
+- Water and weight creation are never replayed after an ambiguous failure (a
+  timeout, lost response or 5xx reply), like food-log creation and token minting.
+  A 429 `rate_limited` reply recorded nothing, so it is retried within the limits.
+- A water amount must be within its unit's range (1–811.5 `fl_oz`, 0.125–101.4
+  `cup`, 30–24000 `ml`), and a food or serving quantity must be greater than zero.
+  Both raise `JanuaryValidationError` before any request.
+- `client_tokens.create`, `HttpClientTokenIssuer` and the `ClientScope` type accept
+  the new log scopes.
+- A correction input accepts `confidence=None`, which text analyses and corrected
+  results return.
 - `food_logs.update` rejects an empty update before sending it, and only sends the
   fields you set.
 - `food_analysis.correct` sends a returned `FoodScan` back as the correction input

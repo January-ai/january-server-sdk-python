@@ -271,8 +271,9 @@ and [runnable portion example](examples/portions/main.py).
 ### Water and weight logs
 
 Water and weight logs use the same user view as food logs. Water amounts are
-`fl_oz` (1–811.5), `cup` (0.125–101.4) or `ml` (30–24000); weights are `lb` or
-`kg`. Both are stored in the unit you send.
+`fl_oz` (1–811.5), `cup` (0.125–101.4) or `ml` (30–24000); a value outside its
+unit's range raises `JanuaryValidationError` before any request. Weights are `lb`
+or `kg`. Both are stored in the unit you send.
 
 ```python
 entry = user.water_logs.create(amount={"value": 250, "unit": "ml"})
@@ -297,7 +298,8 @@ A user's water is capped at 24 litres per day: a log that would exceed it raises
 `BadRequestError` with code `daily_water_limit_exceeded`. Deleting a water log is
 idempotent, so an unknown ID also returns `204`. Weight logs cannot be deleted.
 Like food-log creation, water and weight creation are never replayed after an
-ambiguous failure.
+ambiguous failure (a timeout, lost response or 5xx reply); a 429 `rate_limited`
+reply recorded nothing, so it is retried like any other request.
 
 ## Server-only operations
 
@@ -354,8 +356,9 @@ Do not log keys, tokens or food payloads.
 
 Clients default to two bounded, error-code-aware retries with jitter and
 Retry-After support. Permanent errors and credit exhaustion are not retried.
-Token minting and food-log creation are not replayed after ambiguous network
-failures or 5xx responses. Retried analysis calls may consume additional credits.
+Token minting and food, water and weight-log creation are not replayed after
+ambiguous network failures or 5xx responses; a 429 `rate_limited` reply recorded
+nothing, so they retry it. Retried analysis calls may consume additional credits.
 
 Defaults are 60 seconds per call and 120 seconds for analysis, with a 5-second
 connection timeout. Override using `timeout=`; use `max_retries=0` for one attempt.

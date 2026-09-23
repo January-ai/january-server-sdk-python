@@ -190,6 +190,19 @@ class Contract:
     def encode(
         self, value: Any, schema: dict[str, Any], label: str, *, allow_response_fields: bool = False
     ) -> Any:
+        encoded: Any = self._encode(
+            value, schema, label, allow_response_fields=allow_response_fields
+        )
+        rule = self.resolve(schema).get("x-january-range-by-unit")
+        if isinstance(rule, dict) and isinstance(encoded, dict):
+            self._check_range_by_unit(
+                cast(dict[str, Any], encoded), cast(dict[str, Any], rule), label
+            )
+        return cast(Any, encoded)
+
+    def _encode(
+        self, value: Any, schema: dict[str, Any], label: str, *, allow_response_fields: bool
+    ) -> Any:
         schema = self.resolve(schema)
         response_model = isinstance(value, APIModel) and getattr(value, "_response_origin", False)
         if isinstance(value, BaseModel):
@@ -258,14 +271,17 @@ class Contract:
                     date.fromisoformat(value)
                 except ValueError:
                     raise JanuaryValidationError(f"{label} must be an ISO calendar date") from None
-        if (
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and (
-                value < schema.get("minimum", -math.inf) or value > schema.get("maximum", math.inf)
-            )
-        ):
-            raise JanuaryValidationError(f"{label} is outside the allowed range")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            minimum = schema.get("minimum", -math.inf)
+            maximum = schema.get("maximum", math.inf)
+            # OpenAPI 3.0 exclusive bounds: true makes minimum/maximum exclusive.
+            if (
+                value < minimum
+                or value > maximum
+                or (schema.get("exclusiveMinimum") is True and value == minimum)
+                or (schema.get("exclusiveMaximum") is True and value == maximum)
+            ):
+                raise JanuaryValidationError(f"{label} is outside the allowed range")
         if isinstance(value, list):
             items = cast(list[Any], value)
             if len(items) < schema.get("minItems", 0) or len(items) > schema.get(
@@ -312,6 +328,30 @@ class Contract:
                 result[extra] = _json_value(mapping[extra])
             return result
         return cast(Any, value)
+
+    @staticmethod
+    def _check_range_by_unit(value: dict[str, Any], rule: dict[str, Any], label: str) -> None:
+        """Hold an encoded object's value to the range of its unit.
+
+        A property holding a shared object may narrow that object's ranges; an unknown
+        or missing unit is left to the unit property's own rule.
+        """
+        number = value.get(rule["valueProperty"])
+        unit = value.get(rule["unitProperty"])
+        ranges = cast(dict[str, dict[str, float]], rule["ranges"])
+        if (
+            not isinstance(number, (int, float))
+            or isinstance(number, bool)
+            or not isinstance(unit, str)
+            or unit not in ranges
+        ):
+            return
+        limits = ranges[unit]
+        if not limits["minimum"] <= number <= limits["maximum"]:
+            raise JanuaryValidationError(
+                f"{label}.{_snake(rule['valueProperty'])} must be from {limits['minimum']:g} "
+                f"through {limits['maximum']:g} {unit}"
+            )
 
 
 class HTTPBase:
