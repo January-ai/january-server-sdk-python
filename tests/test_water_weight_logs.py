@@ -702,6 +702,14 @@ def test_client_token_scopes_cover_the_new_logs() -> None:
     assert b"water_logs:write" in captured[0].read() and b"weight_logs:read" in captured[0].read()
 
 
+def test_conflict_is_a_known_code_that_is_never_retried() -> None:
+    from januaryai._backoff import KNOWN_CODES, should_retry_response
+
+    assert "conflict" in KNOWN_CODES
+    for status in (409, 429, 500, 503):
+        assert not should_retry_response(status, "conflict")
+
+
 @pytest.mark.parametrize(
     "food_id,serving_id",
     [
