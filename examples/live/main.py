@@ -389,7 +389,10 @@ async def workflow(
         secret_key=config.api_key, max_retries=0, timeout=config.timeout
     )
     user = client.for_user(user_id, end_user_timezone="UTC")
-    started = datetime.now(UTC)
+    # The API stores times in UTC with milliseconds, so send them at that precision
+    # and a returned time can be compared with the one sent.
+    now = datetime.now(UTC)
+    started = now.replace(microsecond=now.microsecond // 1000 * 1000)
     date_range = {"start": started.date().isoformat(), "end": started.date().isoformat()}
     owned_logs: set[str] = set()
     owned_water_logs: set[str] = set()
@@ -673,7 +676,11 @@ async def workflow(
                     )
                 raise
             # A success reply the runner cannot confirm leaves the weight's state unknown.
-            if not (entry.weight.unit == "kg" and entry.weight.value == 65):
+            if not (
+                entry.weight.unit == "kg"
+                and entry.weight.value == 65
+                and entry.measured_at == started
+            ):
                 unconfirmed.append(
                     ("cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed")
                 )
