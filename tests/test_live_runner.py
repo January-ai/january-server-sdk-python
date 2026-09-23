@@ -58,10 +58,18 @@ def synthetic_environment(root):
 
 
 @contextmanager
-def service(fail=None, revoke_count=1, hide_logs=False):
+def service(
+    fail=None, revoke_count=1, hide_logs=False, drop=(), reject=(), malformed=(), shifted=()
+):
     state = {
+        "malformed": set(malformed),
+        "shifted": set(shifted),
+        "drop": set(drop),
+        "reject": set(reject),
         "requests": [],
         "logs": {},
+        "water": {},
+        "weights": {},
         "tokens": {},
         "users": set(),
         "fail": fail or {},
@@ -113,7 +121,7 @@ def service(fail=None, revoke_count=1, hide_logs=False):
             if op == "createFoodLog":
                 assert body is not None
                 log = response["body"]
-                log.update(id=str(uuid4()), name=body.get("name"), eaten_at=body["eaten_at"])
+                log.update(id=str(uuid4()), name=body.get("name"), created_at=body["created_at"])
                 state["logs"].setdefault(user, {})[log["id"]] = deepcopy(log)
             if op == "listFoodLogs":
                 response["body"] = {"items": list(state["logs"].get(user, {}).values())}
@@ -130,7 +138,9 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 assert "week_start" not in query, query
                 start = date.fromisoformat(query["start_date"][0])
                 end = date.fromisoformat(query["end_date"][0])
-                eaten_dates = [log["eaten_at"][:10] for log in state["logs"].get(user, {}).values()]
+                eaten_dates = [
+                    log["created_at"][:10] for log in state["logs"].get(user, {}).values()
+                ]
                 buckets = []
                 day = start
                 while day <= end:
@@ -171,6 +181,88 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"] = deepcopy(state["logs"][user][log_id])
             if op == "deleteFoodLog" and op not in state["fail"]:
                 state["logs"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
+            # A rejected create records nothing. A failed or dropped one is recorded
+            # first, the way a server that commits before replying would.
+            if op == "createWaterLog" and op not in state["reject"]:
+                assert body is not None
+                entry = response["body"]
+                # The API returns the stored time in UTC with milliseconds.
+                consumed = datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
+                entry.update(
+                    id=str(uuid4()),
+                    amount=body["amount"],
+                    created_at=consumed.astimezone(UTC)
+                    .isoformat(timespec="milliseconds")
+                    .replace("+00:00", "Z"),
+                )
+                state["water"].setdefault(user, {})[entry["id"]] = deepcopy(entry)
+                if op in state["malformed"]:
+                    # Recorded, but the success reply does not match what was sent.
+                    response["body"] = {**entry, "amount": {"value": 251, "unit": "ml"}}
+                if op in state["shifted"]:
+                    # Recorded, but the reply names a different consumption time.
+                    later = consumed.astimezone(UTC) + timedelta(minutes=1)
+                    response["body"] = {
+                        **entry,
+                        "created_at": later.isoformat(timespec="milliseconds").replace(
+                            "+00:00", "Z"
+                        ),
+                    }
+            if op == "listWaterLogs":
+                query = parse_qs(location.query)
+                unit = query["unit"][0]
+                total = sum(
+                    entry["amount"]["value"]
+                    * (29.5735 if entry["amount"]["unit"] == "fl_oz" else 1)
+                    for entry in state["water"].get(user, {}).values()
+                )
+                if unit == "fl_oz":
+                    total = total / 29.5735
+                response["body"] = {
+                    "items": (
+                        [
+                            {
+                                "date": query["start_date"][0],
+                                "total": {"value": round(total, 1), "unit": unit},
+                            }
+                        ]
+                        if total
+                        else []
+                    )
+                }
+            if op == "deleteWaterLog" and op not in state["fail"]:
+                state["water"].get(user, {}).pop(unquote(location.path.rsplit("/", 1)[1]), None)
+            if op == "createWeightLog" and op not in state["reject"]:
+                assert body is not None
+                # The API returns the stored time in UTC with milliseconds.
+                measured = datetime.fromisoformat(body["created_at"].replace("Z", "+00:00"))
+                response["body"].update(
+                    weight=body["weight"],
+                    created_at=measured.astimezone(UTC)
+                    .isoformat(timespec="milliseconds")
+                    .replace("+00:00", "Z"),
+                )
+                state["weights"].setdefault(user, []).append(deepcopy(response["body"]))
+                if op in state["malformed"]:
+                    # Recorded, but the success reply does not match what was sent.
+                    response["body"] = {**response["body"], "weight": {"value": 66, "unit": "kg"}}
+                if op in state["shifted"]:
+                    # Recorded, but the reply names a different measurement time.
+                    later = measured.astimezone(UTC) + timedelta(minutes=1)
+                    response["body"] = {
+                        **response["body"],
+                        "created_at": later.isoformat(timespec="milliseconds").replace(
+                            "+00:00", "Z"
+                        ),
+                    }
+            if op == "listWeightLogs":
+                query = parse_qs(location.query)
+                latest = state["weights"].get(user, [])
+                response["body"] = {
+                    "items": [{"date": query["start_date"][0], "weight": latest[-1]["weight"]}]
+                    if latest
+                    else []
+                }
             if op == "createClientToken":
                 assert body is not None
                 token = "ct-offline-" + str(uuid4())
@@ -191,6 +283,16 @@ def service(fail=None, revoke_count=1, hide_logs=False):
                 response["body"]["revoked_count"] = revoke_count
             if auth and auth.startswith("Bearer ct-"):
                 assert auth[7:] in state["tokens"].values()
+            if op in state["drop"]:
+                # The write is recorded, then the connection closes before any reply.
+                self.close_connection = True
+                return
+            if op in state["reject"]:
+                response = {
+                    "status": 400,
+                    "headers": {"x-request-id": "req-safe"},
+                    "body": {"code": "daily_water_limit_exceeded", "message": "over the cap"},
+                }
             if op in state["fail"]:
                 response = {
                     "status": 503,
@@ -280,7 +382,7 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     result = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
     assert code == 2
     assert result["status"] == "NOT_RUN"
-    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 42}
+    assert result["counts"] == {"PASS": 0, "FAIL": 0, "BLOCKED": 52}
     assert result["results"][0]["code"] == "missing_api_key"
     assert not (tmp_path / ".env").exists()
 
@@ -290,16 +392,19 @@ def test_missing_key_no_network_and_explicit_not_run(tmp_path, monkeypatch):
     [None, "http://127.0.0.1:1", "https://unexpected.invalid"],
     ids=["default", "legacy-loopback-ignored", "legacy-host-ignored"],
 )
-def test_default_both_modes_all_21_local_http_and_live_ids(tmp_path, legacy_url):
+def test_default_both_modes_all_26_local_http_and_live_ids(tmp_path, legacy_url):
     if legacy_url is not None:
         # Synthetic temporary dotenv only: an obsolete setting must not change routing.
         (tmp_path / ".env").write_text(f"JANUARY_BASE_URL={legacy_url}\n")
     with service() as state:
         code, report, output = run(tmp_path, state)
         assert code == 0, report
-        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 52, "FAIL": 0, "BLOCKED": 0}
         assert report["cleanupFailures"] == 0
-        assert len(state["requests"]) == 44  # 21 + one client-token probe per mode.
+        assert len(state["requests"]) == 54  # 26 + one client-token probe per mode.
+        water = [r for r in state["requests"] if r["operation"] == "listWaterLogs"]
+        assert len(water) == 2 and all(r["query"]["unit"] == ["ml"] for r in water)
+        assert not any(state["water"].values())
         summaries = [r for r in state["requests"] if r["operation"] == "getFoodLogSummary"]
         assert len(summaries) == 2 and all(
             r["query"]["timezone"] == ["UTC"] and r["query"]["group_by"] == ["day"]
@@ -340,9 +445,9 @@ def test_expanded_live_image_matrix_over_local_http(tmp_path):
         code = live.main(["--image-matrix"], root=tmp_path, environ=environment, emit=output.append)
         report = json.loads((tmp_path / ".e2e-results/latest.json").read_text(encoding="utf-8"))
         assert code == 0, report
-        assert report["counts"] == {"PASS": 42, "FAIL": 0, "BLOCKED": 0}
+        assert report["counts"] == {"PASS": 52, "FAIL": 0, "BLOCKED": 0}
         assert report["imageCounts"] == {"PASS": 34, "FAIL": 0, "BLOCKED": 0}
-        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 78
+        assert report["expectedImageCases"] == 34 and len(state["requests"]) == 88
         assert not state["tokens"] and not any(state["logs"].values())
         assert report["cleanupFailures"] == 0
 
@@ -423,6 +528,114 @@ def test_cleanup_failures_fail_run_and_do_not_retry_or_loop(tmp_path):
         code, report, _ = run(tmp_path, state, "sync")
         assert code == 0
         assert len(state["revocations"]) == 1
+
+
+def unconfirmed_rows(report, state, operation, code):
+    rows = [r for r in report["results"] if r["operation"] == operation]
+    assert len(rows) == 1, report["results"]
+    row = rows[0]
+    assert row["status"] == "FAIL" and row["code"] == code and row["cleanup"]
+    assert row["endUserId"] in state["users"]
+    assert re.fullmatch(r"sdk-e2e-python-[0-9a-f-]{36}", row["endUserId"])
+    logged = datetime.fromisoformat(row["at"].replace("Z", "+00:00"))
+    assert abs((datetime.now(UTC) - logged).total_seconds()) < 60
+    assert report["status"] == "FAIL" and report["cleanupFailures"] >= 1
+    return row
+
+
+@pytest.mark.parametrize("failure", ["drop", "fail"])
+def test_water_create_without_a_usable_reply_names_the_user_and_time(tmp_path, failure):
+    # The list endpoint returns daily totals, so an unreturned water log ID is unrecoverable.
+    fake = (
+        service(drop={"createWaterLog"})
+        if failure == "drop"
+        else service(fail={"createWaterLog": True})
+    )
+    with fake as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert rows["water_logs.delete"]["status"] == "BLOCKED"
+        assert sum(r["operation"] == "createWaterLog" for r in state["requests"]) == 1
+        row = unconfirmed_rows(
+            report, state, "cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed"
+        )
+        assert row["endUserId"] in output and row["at"] in output
+
+
+@pytest.mark.parametrize("failure", ["malformed", "shifted"])
+def test_unverified_water_reply_is_unconfirmed_and_not_deleted(tmp_path, failure):
+    fake = (
+        service(malformed={"createWaterLog"})
+        if failure == "malformed"
+        else service(shifted={"createWaterLog"})
+    )
+    with fake as state:
+        code, report, _output = run(tmp_path, state, "sync")
+        assert code == 1
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert not any(r["operation"] == "deleteWaterLog" for r in state["requests"])
+        unconfirmed_rows(
+            report, state, "cleanup.water_logs.unconfirmed", "water_log_cleanup_unconfirmed"
+        )
+
+
+def test_rejected_water_create_needs_no_cleanup(tmp_path):
+    with service(reject={"createWaterLog"}) as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        # A definitive rejection records nothing, so there is nothing to clean up.
+        assert sum(r["operation"] == "createWaterLog" for r in state["requests"]) == 1
+        assert not any(state["water"].values())
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["water_logs.create"]["status"] == "FAIL"
+        assert rows["water_logs.delete"]["status"] == "BLOCKED"
+        assert report["cleanupFailures"] == 0
+        assert not any("endUserId" in r for r in report["results"])
+        assert all(user not in output for user in state["users"])
+
+
+def test_rejected_weight_create_is_neither_retained_nor_unconfirmed(tmp_path):
+    with service(reject={"createWeightLog"}) as state:
+        code, report, output = run(tmp_path, state, "sync")
+        assert code == 1
+        assert not any(state["weights"].values())
+        rows = {r["operation"]: r for r in report["results"]}
+        assert rows["weight_logs.create"]["status"] == "FAIL"
+        assert not [r for r in report["results"] if r["kind"] == "retained"]
+        assert report["cleanupFailures"] == 0
+        assert all(user not in output for user in state["users"])
+
+
+@pytest.mark.parametrize("failure", ["drop", "fail", "malformed", "shifted"])
+def test_weight_create_without_a_usable_reply_names_the_user_and_time(tmp_path, failure):
+    fake = {
+        "drop": lambda: service(drop={"createWeightLog"}),
+        "fail": lambda: service(fail={"createWeightLog": True}),
+        "malformed": lambda: service(malformed={"createWeightLog"}),
+        "shifted": lambda: service(shifted={"createWeightLog"}),
+    }[failure]()
+    with fake as state:
+        code, report, _output = run(tmp_path, state, "async")
+        assert code == 1
+        assert not [r for r in report["results"] if r["kind"] == "retained"]
+        unconfirmed_rows(
+            report, state, "cleanup.weight_logs.unconfirmed", "weight_log_create_unconfirmed"
+        )
+
+
+def test_weight_logs_are_retained_on_the_run_user_only(tmp_path):
+    with service() as state:
+        code, report, _output = run(tmp_path, state)
+        assert code == 0
+        retained = [r for r in report["results"] if r["kind"] == "retained"]
+        assert [(r["mode"], r["operation"], r["status"], r["code"]) for r in retained] == [
+            ("sync", "weight_logs.create", "RETAINED", "no_delete_endpoint_run_user_only"),
+            ("async", "weight_logs.create", "RETAINED", "no_delete_endpoint_run_user_only"),
+        ]
+        assert set(state["weights"]) == state["users"]
 
 
 def test_report_sanitizes_error_metadata(tmp_path):

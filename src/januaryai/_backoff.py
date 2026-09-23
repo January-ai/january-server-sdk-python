@@ -43,6 +43,7 @@ _PERMANENT_CODES: frozenset[str] = frozenset(
         "unauthorized",
         "forbidden",
         "not_found",
+        "conflict",
         "not_implemented",
         "payload_too_large",
     }

@@ -130,7 +130,7 @@ class SyncFoodAnalysis(SyncResource):
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
             "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
         ))
@@ -148,12 +148,12 @@ class SyncFoodAnalysis(SyncResource):
 
     def correct(
         self, *,
-        analysis: FoodScan | FoodScanInput,
+        analysis: FoodScan | CorrectionAnalysis | CorrectionAnalysisInput,
         instruction: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically. `meal_name` may be omitted (treated as null); `total_nutrients` may be omitted because it is recalculated rather than trusted. Older results may omit serving `weight_grams`; it is treated as unknown. The forwarded nutrients (calories, protein, carbohydrates, net_carbohydrates, total_fat, saturated_fat, fiber, total_sugars, added_sugars, sodium) must each have a `value` from 0 to 1000000 and a `unit` of at most 16 characters; every analysis result already satisfies this. A detection the analysis returned incomplete — with a null `name` or serving `unit` — is left out of the corrected result, because the correction model needs what it lacks; describe that food in `instruction` if it belongs in the meal.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
             "correctPhotoScan", {"analysis": analysis, "instruction": instruction}, FoodScan, self._context, timeout, cancel_event,
         ))
@@ -183,7 +183,7 @@ class SyncFoodLogs(SyncResource):
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, self._transport.request(
             "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout, cancel_event,
         ))
@@ -199,7 +199,7 @@ class SyncFoodLogs(SyncResource):
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodLogSummary:
-        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodLogSummary, self._transport.request(
             "getFoodLogSummary", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "group_by": group_by, "week_start": week_start}, FoodLogSummary, self._context, timeout, cancel_event,
         ))
@@ -244,6 +244,77 @@ class SyncFoodLogs(SyncResource):
         ))
 
 @dataclass(frozen=True, repr=False)
+class SyncWaterLogs(SyncResource):
+    def create(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        amount: WaterAmount | WaterAmountInput,
+        consumed_at: str | datetime | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> WaterLog:
+        "Log one amount of water for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    amount: How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.\n    consumed_at: When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: WaterLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(WaterLog, self._transport.request(
+            "createWaterLog", {"end_user_id": end_user_id, "amount": amount, "consumed_at": consumed_at}, WaterLog, self._context, timeout, cancel_event,
+        ))
+
+    def list(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        unit: VolumeUnitInput,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> ListWaterLogsResponse:
+        "List an end user's daily water totals over a local date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    unit: The unit every daily total is returned in.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListWaterLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ListWaterLogsResponse, self._transport.request(
+            "listWaterLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "unit": unit}, ListWaterLogsResponse, self._context, timeout, cancel_event,
+        ))
+
+    def delete(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        log_id: WaterLogId,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> ResponseMetadata:
+        "Delete one water log by ID; deleting an unknown log also succeeds.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ResponseMetadata, self._transport.request(
+            "deleteWaterLog", {"end_user_id": end_user_id, "log_id": log_id}, ResponseMetadata, self._context, timeout, cancel_event,
+        ))
+
+@dataclass(frozen=True, repr=False)
+class SyncWeightLogs(SyncResource):
+    def create(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        weight: Weight | WeightInput,
+        measured_at: str | datetime | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> WeightLog:
+        "Log one weight measurement for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    weight: The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.\n    measured_at: When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: WeightLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(WeightLog, self._transport.request(
+            "createWeightLog", {"end_user_id": end_user_id, "weight": weight, "measured_at": measured_at}, WeightLog, self._context, timeout, cancel_event,
+        ))
+
+    def list(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        timeout: float | httpx.Timeout | None = None,
+        cancel_event: Event | None = None,
+    ) -> ListWeightLogsResponse:
+        "List an end user's latest daily weights over a local date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ListWeightLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ListWeightLogsResponse, self._transport.request(
+            "listWeightLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListWeightLogsResponse, self._context, timeout, cancel_event,
+        ))
+
+@dataclass(frozen=True, repr=False)
 class SyncGlucose(SyncResource):
     def predict(
         self, *,
@@ -280,6 +351,14 @@ class SyncShared(SyncResource):
         return SyncFoodLogs(self._transport, self._context)
 
     @property
+    def water_logs(self) -> SyncWaterLogs:
+        return SyncWaterLogs(self._transport, self._context)
+
+    @property
+    def weight_logs(self) -> SyncWeightLogs:
+        return SyncWeightLogs(self._transport, self._context)
+
+    @property
     def glucose(self) -> SyncGlucose:
         return SyncGlucose(self._transport, self._context)
 
@@ -288,12 +367,12 @@ class SyncRoot(SyncShared):
     def create_client_token(
         self, *,
         end_user_id: str,
-        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]],
+        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read", "water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"]],
         ttl_seconds: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> ClientToken:
-        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read, water_logs:read, water_logs:write, weight_logs:read, weight_logs:write.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
         return cast(ClientToken, self._transport.request(
             "createClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientToken, self._context, timeout, cancel_event,
         ))
@@ -429,7 +508,7 @@ class AsyncFoodAnalysis(AsyncResource):
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
             "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout,
         ))
@@ -446,11 +525,11 @@ class AsyncFoodAnalysis(AsyncResource):
 
     async def correct(
         self, *,
-        analysis: FoodScan | FoodScanInput,
+        analysis: FoodScan | CorrectionAnalysis | CorrectionAnalysisInput,
         instruction: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Correct a prior food analysis using a plain-language instruction.\n\nArgs:\n    analysis: The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically. `meal_name` may be omitted (treated as null); `total_nutrients` may be omitted because it is recalculated rather than trusted. Older results may omit serving `weight_grams`; it is treated as unknown. The forwarded nutrients (calories, protein, carbohydrates, net_carbohydrates, total_fat, saturated_fat, fiber, total_sugars, added_sugars, sodium) must each have a `value` from 0 to 1000000 and a `unit` of at most 16 characters; every analysis result already satisfies this. A detection the analysis returned incomplete — with a null `name` or serving `unit` — is left out of the corrected result, because the correction model needs what it lacks; describe that food in `instruction` if it belongs in the meal.\n    instruction: Plain-English description of what to correct.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
             "correctPhotoScan", {"analysis": analysis, "instruction": instruction}, FoodScan, self._context, timeout,
         ))
@@ -478,7 +557,7 @@ class AsyncFoodLogs(AsyncResource):
         timezone: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> ListFoodLogsResponse:
-        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "List an end user's food logs within a calendar-date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListFoodLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(ListFoodLogsResponse, await self._transport.request(
             "listFoodLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListFoodLogsResponse, self._context, timeout,
         ))
@@ -493,7 +572,7 @@ class AsyncFoodLogs(AsyncResource):
         week_start: Literal["monday", "sunday"] | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodLogSummary:
-        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts a meal near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Summarize an end user's food logs over a date range into day or week buckets with totals and averages.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    group_by: Bucket size. `day` is one bucket per local calendar date; `week` is one per week, with the first and last clipped to the range.\n    week_start: Which weekday a week bucket begins on. Ignored when `group_by=day`, where the response reports `week_start: null`.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodLogSummary.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodLogSummary, await self._transport.request(
             "getFoodLogSummary", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "group_by": group_by, "week_start": week_start}, FoodLogSummary, self._context, timeout,
         ))
@@ -535,6 +614,72 @@ class AsyncFoodLogs(AsyncResource):
         ))
 
 @dataclass(frozen=True, repr=False)
+class AsyncWaterLogs(AsyncResource):
+    async def create(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        amount: WaterAmount | WaterAmountInput,
+        consumed_at: str | datetime | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> WaterLog:
+        "Log one amount of water for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    amount: How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.\n    consumed_at: When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: WaterLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(WaterLog, await self._transport.request(
+            "createWaterLog", {"end_user_id": end_user_id, "amount": amount, "consumed_at": consumed_at}, WaterLog, self._context, timeout,
+        ))
+
+    async def list(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        unit: VolumeUnitInput,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> ListWaterLogsResponse:
+        "List an end user's daily water totals over a local date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    unit: The unit every daily total is returned in.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListWaterLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ListWaterLogsResponse, await self._transport.request(
+            "listWaterLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone, "unit": unit}, ListWaterLogsResponse, self._context, timeout,
+        ))
+
+    async def delete(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        log_id: WaterLogId,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> ResponseMetadata:
+        "Delete one water log by ID; deleting an unknown log also succeeds.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    log_id: The log id returned when the log was created.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ResponseMetadata.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ResponseMetadata, await self._transport.request(
+            "deleteWaterLog", {"end_user_id": end_user_id, "log_id": log_id}, ResponseMetadata, self._context, timeout,
+        ))
+
+@dataclass(frozen=True, repr=False)
+class AsyncWeightLogs(AsyncResource):
+    async def create(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        weight: Weight | WeightInput,
+        measured_at: str | datetime | UnsetType = UNSET,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> WeightLog:
+        "Log one weight measurement for an end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    weight: The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.\n    measured_at: When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: WeightLog.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        return cast(WeightLog, await self._transport.request(
+            "createWeightLog", {"end_user_id": end_user_id, "weight": weight, "measured_at": measured_at}, WeightLog, self._context, timeout,
+        ))
+
+    async def list(
+        self, *,
+        end_user_id: PartnerUserId | UnsetType = UNSET,
+        start_date: str | date | datetime,
+        end_date: str | date | datetime,
+        timezone: str,
+        timeout: float | httpx.Timeout | None = None,
+    ) -> ListWeightLogsResponse:
+        "List an end user's latest daily weights over a local date range.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    start_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    end_date: Calendar date (YYYY-MM-DD), date, or datetime. A datetime contributes its calendar date without timezone conversion.\n    timezone: IANA timezone that defines the local calendar days this range covers. Required: without it the days would be cut in UTC, which silently shifts anything logged near midnight into the wrong day for anyone not on UTC.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ListWeightLogsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        return cast(ListWeightLogsResponse, await self._transport.request(
+            "listWeightLogs", {"end_user_id": end_user_id, "start_date": start_date, "end_date": end_date, "timezone": timezone}, ListWeightLogsResponse, self._context, timeout,
+        ))
+
+@dataclass(frozen=True, repr=False)
 class AsyncGlucose(AsyncResource):
     async def predict(
         self, *,
@@ -570,6 +715,14 @@ class AsyncShared(AsyncResource):
         return AsyncFoodLogs(self._transport, self._context)
 
     @property
+    def water_logs(self) -> AsyncWaterLogs:
+        return AsyncWaterLogs(self._transport, self._context)
+
+    @property
+    def weight_logs(self) -> AsyncWeightLogs:
+        return AsyncWeightLogs(self._transport, self._context)
+
+    @property
     def glucose(self) -> AsyncGlucose:
         return AsyncGlucose(self._transport, self._context)
 
@@ -578,11 +731,11 @@ class AsyncRoot(AsyncShared):
     async def create_client_token(
         self, *,
         end_user_id: str,
-        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]],
+        scopes: Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read", "water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"]],
         ttl_seconds: int | UnsetType = UNSET,
         timeout: float | httpx.Timeout | None = None,
     ) -> ClientToken:
-        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
+        "Create a short-lived client token for an authenticated end user.\n\nArgs:\n    end_user_id: Your stable user ID; required for user-owned operations unless bound with for_user().\n    scopes: What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read, water_logs:read, water_logs:write, weight_logs:read, weight_logs:write.\n    ttl_seconds: How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: ClientToken.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nAmbiguous failures are not replayed, preventing duplicate writes."
         return cast(ClientToken, await self._transport.request(
             "createClientToken", {"end_user_id": end_user_id, "scopes": scopes, "ttl_seconds": ttl_seconds}, ClientToken, self._context, timeout,
         ))

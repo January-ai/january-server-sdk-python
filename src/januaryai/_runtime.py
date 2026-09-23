@@ -24,7 +24,12 @@ from anyio.to_thread import run_sync
 from pydantic import BaseModel, ConfigDict, PrivateAttr, TypeAdapter, ValidationError
 
 from ._backoff import classify_transport_error, compute_delay, should_retry_response
-from ._constants import DEFAULT_MAX_RETRIES, MAX_HONORED_RETRY_AFTER, MAX_TOTAL_RETRY_AFTER_WAIT
+from ._constants import (
+    DEFAULT_MAX_RETRIES,
+    MAX_HONORED_RETRY_AFTER,
+    MAX_TOTAL_RETRY_AFTER_WAIT,
+    NEVER_REPLAY_AMBIGUOUS,
+)
 from ._images import prepare_image
 from ._version import __version__
 from .errors import (
@@ -185,6 +190,19 @@ class Contract:
     def encode(
         self, value: Any, schema: dict[str, Any], label: str, *, allow_response_fields: bool = False
     ) -> Any:
+        encoded: Any = self._encode(
+            value, schema, label, allow_response_fields=allow_response_fields
+        )
+        rule = self.resolve(schema).get("x-january-range-by-unit")
+        if isinstance(rule, dict) and isinstance(encoded, dict):
+            self._check_range_by_unit(
+                cast(dict[str, Any], encoded), cast(dict[str, Any], rule), label
+            )
+        return cast(Any, encoded)
+
+    def _encode(
+        self, value: Any, schema: dict[str, Any], label: str, *, allow_response_fields: bool
+    ) -> Any:
         schema = self.resolve(schema)
         response_model = isinstance(value, APIModel) and getattr(value, "_response_origin", False)
         if isinstance(value, BaseModel):
@@ -253,14 +271,17 @@ class Contract:
                     date.fromisoformat(value)
                 except ValueError:
                     raise JanuaryValidationError(f"{label} must be an ISO calendar date") from None
-        if (
-            isinstance(value, (int, float))
-            and not isinstance(value, bool)
-            and (
-                value < schema.get("minimum", -math.inf) or value > schema.get("maximum", math.inf)
-            )
-        ):
-            raise JanuaryValidationError(f"{label} is outside the allowed range")
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            minimum = schema.get("minimum", -math.inf)
+            maximum = schema.get("maximum", math.inf)
+            # OpenAPI 3.0 exclusive bounds: true makes minimum/maximum exclusive.
+            if (
+                value < minimum
+                or value > maximum
+                or (schema.get("exclusiveMinimum") is True and value == minimum)
+                or (schema.get("exclusiveMaximum") is True and value == maximum)
+            ):
+                raise JanuaryValidationError(f"{label} is outside the allowed range")
         if isinstance(value, list):
             items = cast(list[Any], value)
             if len(items) < schema.get("minItems", 0) or len(items) > schema.get(
@@ -307,6 +328,30 @@ class Contract:
                 result[extra] = _json_value(mapping[extra])
             return result
         return cast(Any, value)
+
+    @staticmethod
+    def _check_range_by_unit(value: dict[str, Any], rule: dict[str, Any], label: str) -> None:
+        """Hold an encoded object's value to the range of its unit.
+
+        A property holding a shared object may narrow that object's ranges; an unknown
+        or missing unit is left to the unit property's own rule.
+        """
+        number = value.get(rule["valueProperty"])
+        unit = value.get(rule["unitProperty"])
+        ranges = cast(dict[str, dict[str, float]], rule["ranges"])
+        if (
+            not isinstance(number, (int, float))
+            or isinstance(number, bool)
+            or not isinstance(unit, str)
+            or unit not in ranges
+        ):
+            return
+        limits = ranges[unit]
+        if not limits["minimum"] <= number <= limits["maximum"]:
+            raise JanuaryValidationError(
+                f"{label}.{_snake(rule['valueProperty'])} must be from {limits['minimum']:g} "
+                f"through {limits['maximum']:g} {unit}"
+            )
 
 
 class HTTPBase:
@@ -447,6 +492,10 @@ class HTTPBase:
                 for p in op["fields"]
                 if not isinstance(values.get(p["publicName"], UNSET), UnsetType)
             }
+            # A partial update must carry at least one field; the API rejects an
+            # empty patch, so stop before sending one.
+            if len(body) < self._contract.resolve(op["bodySchema"]).get("minProperties", 0):
+                raise JanuaryValidationError("Provide at least one field to update")
             # Only returned detection models may preserve additive response fields.
             # Raw dictionaries, other requests, and known fields stay schema-validated.
             request["json"] = self._contract.encode(
@@ -615,10 +664,13 @@ class HTTPBase:
         operation = self._contract.data["operations"][operation_id]
         if operation.get("retryNever", False):
             return None
+        replay_ambiguous = (
+            operation.get("retryAmbiguous", False) and operation_id not in NEVER_REPLAY_AMBIGUOUS
+        )
         if isinstance(error, JanuaryAPIError):
             if not should_retry_response(error.status_code, error.code):
                 return None
-            if error.status_code != 429 and not operation.get("retryAmbiguous", False):
+            if error.status_code != 429 and not replay_ambiguous:
                 return None
             delay = error.retry_after
             if delay is not None:
@@ -643,9 +695,7 @@ class HTTPBase:
                 if isinstance(error.cause, Exception)
                 else "fatal"
             )
-            if kind != "pre_send" and not (
-                kind == "ambiguous" and operation.get("retryAmbiguous", False)
-            ):
+            if kind != "pre_send" and not (kind == "ambiguous" and replay_ambiguous):
                 return None
         return compute_delay(attempt, rng=self._rng)
 

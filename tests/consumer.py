@@ -67,7 +67,7 @@ class ConsumerTest(unittest.TestCase):
             for kwargs in [
                 {"scopes": []},
                 {"scopes": ["unknown"]},
-                {"scopes": ["foods:read"] * 7},
+                {"scopes": ["foods:read"] * 11},
                 {"ttl_seconds": 0},
                 {"ttl_seconds": True},
                 {"ttl_seconds": 300.5},

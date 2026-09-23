@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import date as _date, datetime
 from typing import Literal
 from typing_extensions import Required, TypedDict
 from pydantic import Field
@@ -14,7 +14,9 @@ AutocompleteFoodCategory = str
 AutocompleteFoodCategoryInput = Literal["generic", "branded"]
 Barcode = str
 ConfidenceScore = str | None
-ConfidenceScoreInput = Literal["high", "medium", "low"]
+ConfidenceScoreInput = Literal["high", "medium", "low"] | None
+CreditPlan = str
+CreditPlanInput = Literal["free", "pro", "startup", "enterprise", "unlimited"]
 DietPreference = str
 DietPreferenceInput = Literal["vegetarian", "vegan", "keto", "paleo", "pescatarian", "low_carbohydrate", "high_protein", "kosher", "halal"]
 DietRestriction = str
@@ -24,29 +26,34 @@ FoodCategoryInput = Literal["generic", "branded", "recipe"]
 FoodId = str
 FoodLogId = str
 GlucoseImpact = str | None
-GlucoseImpactInput = Literal["low", "medium", "high"]
+GlucoseImpactInput = Literal["low", "medium", "high"] | None
 HeightUnit = str
 HeightUnitInput = Literal["in", "cm"]
 MedicalCondition = str
 MedicalConditionInput = Literal["type_2_diabetes", "prediabetes"]
+NutrientUnit = str
+NutrientUnitInput = Literal["g", "mg", "kcal", "IU", "mcg"]
 PartnerUserId = str
 RestaurantMenuItemId = str
 ServingId = str
 Sex = str
 SexInput = Literal["male", "female"]
+VolumeUnit = str
+VolumeUnitInput = Literal["fl_oz", "ml", "cup"]
+WaterLogId = str
 WeightUnit = str
 WeightUnitInput = Literal["lb", "kg"]
 
 class AlternativeFood(APIModel):
     "AlternativeFood: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Catalog food id, or null when the producer matched none.")
+    id: str = Field(..., alias="id", repr=False, description="Catalog food id.")
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the producer sent a food with no name.")
     brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False)
     servings: list[ServingSummary] = Field(..., alias="servings", repr=False, description="Servings to read the nutrition against. Empty when the recommender returned none — the key itself is always present.")
 
 class AlternativeFoodInput(TypedDict, total=False):
-    id: Required[str | None]
+    id: Required[str]
     name: Required[str | None]
     brand_name: Required[str | None]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
@@ -88,7 +95,7 @@ class ClientTokenInput(TypedDict, total=False):
     expires_in: Required[int]
     expires_at: Required[str | datetime]
     end_user_id: Required[str]
-    scopes: Required[Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]]]
+    scopes: Required[Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read", "water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"]]]
 
 class ClientTokenRevocationResult(APIModel):
     "ClientTokenRevocationResult: typed API data. Unknown response fields are preserved."
@@ -112,28 +119,78 @@ class ConsumedHistoricalFoodInput(TypedDict, total=False):
 
 class CorrectPhotoScanBody(APIModel):
     "CorrectPhotoScanBody: typed API data. Unknown response fields are preserved."
-    analysis: FoodScan = Field(..., alias="analysis", repr=False, description="The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically, and `total_nutrients` is recalculated rather than trusted — send it or leave it out, it makes no difference.")
+    analysis: CorrectionAnalysis = Field(..., alias="analysis", repr=False, description="The result from `POST /v1.2/food-analysis/image` or `/text`, sent back exactly as it was returned. Omitted zero-value nutrient keys are filled in automatically. `meal_name` may be omitted (treated as null); `total_nutrients` may be omitted because it is recalculated rather than trusted. Older results may omit serving `weight_grams`; it is treated as unknown. The forwarded nutrients (calories, protein, carbohydrates, net_carbohydrates, total_fat, saturated_fat, fiber, total_sugars, added_sugars, sodium) must each have a `value` from 0 to 1000000 and a `unit` of at most 16 characters; every analysis result already satisfies this. A detection the analysis returned incomplete — with a null `name` or serving `unit` — is left out of the corrected result, because the correction model needs what it lacks; describe that food in `instruction` if it belongs in the meal.")
     instruction: str = Field(..., alias="instruction", repr=False, description="Plain-English description of what to correct.")
 
 class CorrectPhotoScanBodyInput(TypedDict, total=False):
-    analysis: Required[FoodScan | FoodScanInput]
+    analysis: Required[CorrectionAnalysis | CorrectionAnalysisInput]
     instruction: Required[str]
+
+class CorrectionAnalysis(APIModel):
+    "CorrectionAnalysis: typed API data. Unknown response fields are preserved."
+    meal_name: str | None = Field(default=None, alias="meal_name", repr=False, description="A name for the meal as a whole. Null on text analyses — the caller already has the words. Corrections preserve a null meal name.")
+    total_nutrients: NutritionFacts | None = Field(default=None, alias="total_nutrients", repr=False, description="Optional original totals. Ignored on input; corrections recalculate totals from the corrected foods.")
+    detections: list[CorrectionDetection] = Field(..., alias="detections", repr=False)
+
+class CorrectionAnalysisInput(TypedDict, total=False):
+    meal_name: str | None
+    total_nutrients: NutritionFacts | NutritionFactsInput
+    detections: Required[Sequence[CorrectionDetection | CorrectionDetectionInput]]
+
+class CorrectionDetection(APIModel):
+    "CorrectionDetection: typed API data. Unknown response fields are preserved."
+    confidence: ConfidenceScore = Field(..., alias="confidence", repr=False)
+    food: CorrectionFood = Field(..., alias="food", repr=False)
+
+class CorrectionDetectionInput(TypedDict, total=False):
+    confidence: Required[ConfidenceScoreInput]
+    food: Required[CorrectionFood | CorrectionFoodInput]
+
+class CorrectionFood(APIModel):
+    "CorrectionFood: typed API data. Unknown response fields are preserved."
+    name: str | None = Field(..., alias="name", repr=False, description="Null only when the producer sent a food with no name.")
+    brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
+    id: str = Field(..., alias="id", repr=False, description="Matched catalog food id. Pass it back as food_id when logging this food.")
+    quantity: float = Field(..., alias="quantity", repr=False, description="Positive number of selected catalog servings consumed. Use it unchanged as food-log quantity. Display the consumed amount as food.quantity × food.serving.quantity, followed by food.serving.unit: 4 × 0.5 cup = 2 cups; 0.4 × 100 g = 40 g. Nutrients already describe this consumed portion; do not multiply them again.")
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrition for the consumed portion, already scaled by quantity. Send the analysis back unchanged for corrections.")
+    serving: CorrectionServing = Field(..., alias="serving", repr=False)
+
+class CorrectionFoodInput(TypedDict, total=False):
+    name: Required[str | None]
+    brand_name: Required[str | None]
+    id: Required[str]
+    quantity: Required[float]
+    nutrients: Required[NutritionFacts | NutritionFactsInput]
+    serving: Required[CorrectionServing | CorrectionServingInput]
+
+class CorrectionServing(APIModel):
+    "CorrectionServing: typed API data. Unknown response fields are preserved."
+    id: str = Field(..., alias="id", repr=False, description="Catalog serving id. Pass it back as serving_id when logging this food.")
+    quantity: float = Field(..., alias="quantity", repr=False, description="Positive amount of unit represented by this serving definition. In food analysis and food logs this is one catalog serving: consumed amount = food.quantity × food.serving.quantity (4 × 0.5 cup = 2 cups). Food alternatives instead report their recommended portion amount here.")
+    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
+    weight_grams: float | None = Field(default=None, alias="weight_grams", repr=False, description="Weight in grams of this serving definition. For food analysis and food logs this is one catalog serving, not the consumed portion: consumed grams = food.quantity × food.serving.weight_grams. Null when unknown.")
+
+class CorrectionServingInput(TypedDict, total=False):
+    id: Required[str]
+    quantity: Required[float]
+    unit: Required[str | None]
+    weight_grams: float | None
 
 class CreateClientTokenBody(APIModel):
     "CreateClientTokenBody: typed API data. Unknown response fields are preserved."
     end_user_id: str = Field(..., alias="end_user_id", repr=False, description="Your stable ID for the end user this token acts as. The token is bound to it; requests made with the token act only on this user.")
-    scopes: list[str] = Field(..., alias="scopes", repr=False, description="What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read.")
+    scopes: list[str] = Field(..., alias="scopes", repr=False, description="What the token may do. **Required** — name only the scopes this token needs (least privilege), never the full set out of convenience. A read-only food-lookup screen asks for `[\"foods:read\"]`; a logging screen adds `food_logs:write`. Valid scopes: foods:read, food_analysis:write, food_logs:read, food_logs:write, glucose:read, restaurants:read, water_logs:read, water_logs:write, weight_logs:read, weight_logs:write.")
     ttl_seconds: int | None = Field(default=None, alias="ttl_seconds", repr=False, description="How long the token stays valid, in seconds. Between 300 and 7200; defaults to 1800.")
 
 class CreateClientTokenBodyInput(TypedDict, total=False):
     end_user_id: Required[str]
-    scopes: Required[Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read"]]]
+    scopes: Required[Sequence[Literal["foods:read", "food_analysis:write", "food_logs:read", "food_logs:write", "glucose:read", "restaurants:read", "water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"]]]
     ttl_seconds: int
 
 class CreateFoodLogBody(APIModel):
     "CreateFoodLogBody: typed API data. Unknown response fields are preserved."
     foods: list[FoodLogInputFood] = Field(..., alias="foods", repr=False)
-    eaten_at: datetime | None = Field(default=None, alias="eaten_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
+    eaten_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
     name: str | None = Field(default=None, alias="name", repr=False)
 
 class CreateFoodLogBodyInput(TypedDict, total=False):
@@ -141,46 +198,82 @@ class CreateFoodLogBodyInput(TypedDict, total=False):
     eaten_at: str | datetime
     name: str
 
+class CreateWaterLogBody(APIModel):
+    "CreateWaterLogBody: typed API data. Unknown response fields are preserved."
+    amount: WaterAmount = Field(..., alias="amount", repr=False, description="How much water. An end user's total is capped at 24 L (about 811 fl oz) per day.")
+    consumed_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the water was consumed — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now. Its day is the one the daily cap counts it against.")
+
+class CreateWaterLogBodyInput(TypedDict, total=False):
+    amount: Required[WaterAmount | WaterAmountInput]
+    consumed_at: str | datetime
+
+class CreateWeightLogBody(APIModel):
+    "CreateWeightLogBody: typed API data. Unknown response fields are preserved."
+    weight: Weight = Field(..., alias="weight", repr=False, description="The measured weight. `value` must be 10–1000 for `lb`, or 4.5–453.6 for `kg`; it is stored and returned in the unit sent.")
+    measured_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the weight was measured — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omitted = now.")
+
+class CreateWeightLogBodyInput(TypedDict, total=False):
+    weight: Required[Weight | WeightInput]
+    measured_at: str | datetime
+
 class CreditBalance(APIModel):
     "CreditBalance: typed API data. Unknown response fields are preserved."
-    plan: str = Field(..., alias="plan", repr=False, description="The plan this allowance comes from.")
-    period_start: date = Field(..., alias="period_start", repr=False, description="First day of the current billing period (UTC), inclusive.")
-    period_end: date = Field(..., alias="period_end", repr=False, description="Last day of the current billing period (UTC), inclusive.")
+    plan: CreditPlan = Field(..., alias="plan", repr=False)
+    period_start: _date = Field(..., alias="period_start", repr=False, description="First day of the current billing period (UTC), inclusive.")
+    period_end: _date = Field(..., alias="period_end", repr=False, description="Last day of the current billing period (UTC), inclusive.")
     resets_at: datetime = Field(..., alias="resets_at", repr=False, description="When the allowance resets and `used_credits` returns to 0.")
     included_credits: int | None = Field(..., alias="included_credits", repr=False, description="Credits included in the plan for this period, or `null` when the plan has no ceiling.")
     used_credits: int = Field(..., alias="used_credits", repr=False, description="Credits used so far this period. Billable operations consume credits — how many depends on the operation and your plan — while failed calls cost nothing.")
     remaining_credits: int | None = Field(..., alias="remaining_credits", repr=False, description="Credits left in this period, or `null` when the plan has no ceiling.")
 
 class CreditBalanceInput(TypedDict, total=False):
-    plan: Required[str]
-    period_start: Required[str | date | datetime]
-    period_end: Required[str | date | datetime]
+    plan: Required[CreditPlanInput]
+    period_start: Required[str | _date | datetime]
+    period_end: Required[str | _date | datetime]
     resets_at: Required[str | datetime]
     included_credits: Required[int | None]
     used_credits: Required[int]
     remaining_credits: Required[int | None]
 
+class DailyWaterTotal(APIModel):
+    "DailyWaterTotal: typed API data. Unknown response fields are preserved."
+    date: _date = Field(..., alias="date", repr=False, description="Local calendar date in the request’s `timezone`.")
+    total: Volume = Field(..., alias="total", repr=False, description="Everything logged on this local day, in the unit the request asked for.")
+
+class DailyWaterTotalInput(TypedDict, total=False):
+    date: Required[str | _date | datetime]
+    total: Required[Volume | VolumeInput]
+
+class DailyWeight(APIModel):
+    "DailyWeight: typed API data. Unknown response fields are preserved."
+    date: _date = Field(..., alias="date", repr=False, description="Local calendar date in the request’s `timezone`.")
+    weight: Weight = Field(..., alias="weight", repr=False, description="The weight with the latest `created_at` on this day — later measurements replace earlier ones — in the unit it was logged in.")
+
+class DailyWeightInput(TypedDict, total=False):
+    date: Required[str | _date | datetime]
+    weight: Required[Weight | WeightInput]
+
 class DetectedFood(APIModel):
     "DetectedFood: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Catalog food id, or null when the producer matched none.")
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the producer sent a food with no name.")
     brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="Number of catalog servings consumed, ready to use as food-log quantity. For 40 g from a 100 g serving this is 0.4. Null when the producer supplied no usable portion.")
+    id: str = Field(..., alias="id", repr=False, description="Matched catalog food id. Pass it back as food_id when logging this food.")
+    quantity: float = Field(..., alias="quantity", repr=False, description="Positive number of selected catalog servings consumed. Use it unchanged as food-log quantity. Display the consumed amount as food.quantity × food.serving.quantity, followed by food.serving.unit: 4 × 0.5 cup = 2 cups; 0.4 × 100 g = 40 g. Nutrients already describe this consumed portion; do not multiply them again.")
     serving: ServingSummary = Field(..., alias="serving", repr=False, description="Selected catalog serving definition; its quantity is the size of one serving, not the amount eaten.")
-    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrition for the consumed portion, already scaled by quantity.")
+    nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrition for the consumed portion, already scaled by quantity. Send the analysis back unchanged for corrections.")
 
 class DetectedFoodInput(TypedDict, total=False):
-    id: Required[str | None]
     name: Required[str | None]
     brand_name: Required[str | None]
-    quantity: Required[float | None]
+    id: Required[str]
+    quantity: Required[float]
     serving: Required[ServingSummary | ServingSummaryInput]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
 
 class ErrorResponse(APIModel):
     "ErrorResponse: typed API data. Unknown response fields are preserved."
     message: str = Field(..., alias="message", repr=False, description="A developer-facing explanation of what went wrong and how to fix it.")
-    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 409 or 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nThree more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called a food-log operation with no January-End-User-ID header), `date_range_too_large` (400 — a food-log date range past the documented maximum), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
+    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`conflict` (409) means the request conflicts with an existing resource, such as an Idempotency-Key reused with different files. Resolve the conflict before retrying.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nFour more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called an operation that documents the January-End-User-ID header without sending it), `date_range_too_large` (400 — a date range past the operation's documented maximum or lookback), `daily_water_limit_exceeded` (400 — a water log that would take the end user's total for its day past 24 L; not retryable), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only at the start of the next calendar month: `credit_limit_exceeded` (the monthly credit allowance) and `request_limit_exceeded` (the monthly request allowance). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the monthly ceiling, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
 
 class ErrorResponseInput(TypedDict, total=False):
     message: Required[str]
@@ -199,7 +292,7 @@ class FoodLog(APIModel):
     "FoodLog: typed API data. Unknown response fields are preserved."
     id: str | None = Field(..., alias="id", repr=False, description="Save this id to update or delete the log. Null only when the upstream sent a log with no id — such a log cannot be addressed.")
     foods: list[LoggedFood] = Field(..., alias="foods", repr=False)
-    eaten_at: datetime = Field(..., alias="eaten_at", repr=False, description="When the meal was eaten. UTC, with milliseconds.")
+    eaten_at: datetime = Field(..., alias="created_at", repr=False, description="When the meal was eaten. UTC, with milliseconds.")
     name: str | None = Field(..., alias="name", repr=False, description="Null when no name was given.")
 
 class FoodLogInput(TypedDict, total=False):
@@ -224,8 +317,8 @@ class FoodLogSummary(APIModel):
     group_by: str = Field(..., alias="group_by", repr=False, description="The bucket size used, echoing the request.")
     week_start: str | None = Field(..., alias="week_start", repr=False, description="The weekday week buckets begin on. Always present; `null` when `group_by=day`, where it does not apply.")
     timezone: str = Field(..., alias="timezone", repr=False, description="The IANA timezone the buckets were cut in — the canonical spelling of what was requested.")
-    start_date: date = Field(..., alias="start_date", repr=False, description="First local calendar date of the summarized range, echoing the request.")
-    end_date: date = Field(..., alias="end_date", repr=False, description="Last local calendar date of the summarized range, inclusive.")
+    start_date: _date = Field(..., alias="start_date", repr=False, description="First local calendar date of the summarized range, echoing the request.")
+    end_date: _date = Field(..., alias="end_date", repr=False, description="Last local calendar date of the summarized range, inclusive.")
     buckets: list[FoodLogSummaryBucket] = Field(..., alias="buckets", repr=False, description="The buckets tiling the range, in chronological order and covering it end to end — a day or week with no logs is returned with zero counts rather than skipped.")
     totals: FoodLogSummaryTotals = Field(..., alias="totals", repr=False)
     average_per_logged_day: FoodLogSummaryAverage = Field(..., alias="average_per_logged_day", repr=False)
@@ -234,8 +327,8 @@ class FoodLogSummaryInput(TypedDict, total=False):
     group_by: Required[Literal["day", "week"]]
     week_start: Required[Literal["monday", "sunday"] | None]
     timezone: Required[str]
-    start_date: Required[str | date | datetime]
-    end_date: Required[str | date | datetime]
+    start_date: Required[str | _date | datetime]
+    end_date: Required[str | _date | datetime]
     buckets: Required[Sequence[FoodLogSummaryBucket | FoodLogSummaryBucketInput]]
     totals: Required[FoodLogSummaryTotals | FoodLogSummaryTotalsInput]
     average_per_logged_day: Required[FoodLogSummaryAverage | FoodLogSummaryAverageInput]
@@ -249,15 +342,15 @@ class FoodLogSummaryAverageInput(TypedDict, total=False):
 
 class FoodLogSummaryBucket(APIModel):
     "FoodLogSummaryBucket: typed API data. Unknown response fields are preserved."
-    start_date: date = Field(..., alias="start_date", repr=False, description="First local calendar date this bucket covers. Clipped to the requested range, so the first week bucket may be partial.")
-    end_date: date = Field(..., alias="end_date", repr=False, description="Last local calendar date this bucket covers, inclusive. Equal to start_date when grouping by day.")
+    start_date: _date = Field(..., alias="start_date", repr=False, description="First local calendar date this bucket covers. Clipped to the requested range, so the first week bucket may be partial.")
+    end_date: _date = Field(..., alias="end_date", repr=False, description="Last local calendar date this bucket covers, inclusive. Equal to start_date when grouping by day.")
     logs_count: int = Field(..., alias="logs_count", repr=False, description="How many logs fall in this bucket.")
     days_with_logs: int = Field(..., alias="days_with_logs", repr=False, description="How many distinct local calendar dates in this bucket carry at least one log.")
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Nutrients summed over this bucket. A key is absent when no value was available; `{}` means nothing could be totalled — read `logs_count` to tell an empty bucket from one whose logs were unresolvable.")
 
 class FoodLogSummaryBucketInput(TypedDict, total=False):
-    start_date: Required[str | date | datetime]
-    end_date: Required[str | date | datetime]
+    start_date: Required[str | _date | datetime]
+    end_date: Required[str | _date | datetime]
     logs_count: Required[int]
     days_with_logs: Required[int]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
@@ -275,7 +368,7 @@ class FoodLogSummaryTotalsInput(TypedDict, total=False):
 
 class FoodScan(APIModel):
     "FoodScan: typed API data. Unknown response fields are preserved."
-    meal_name: str | None = Field(..., alias="meal_name", repr=False, description="A name for the meal as a whole. Null on text analyses — the caller already has the words.")
+    meal_name: str | None = Field(..., alias="meal_name", repr=False, description="A name for the meal as a whole. Null on text analyses — the caller already has the words. Corrections preserve a null meal name.")
     total_nutrients: NutritionFacts = Field(..., alias="total_nutrients", repr=False, description="Aggregated nutrition across all detections. Always present; individual keys are omitted when no producer had a value.")
     detections: list[FoodDetection] = Field(..., alias="detections", repr=False, description="Detected foods. Always present — an empty array means nothing was recognized.")
 
@@ -371,7 +464,7 @@ class GlucosePredictionPointInput(TypedDict, total=False):
 
 class GlucosePredictionProfile(APIModel):
     "GlucosePredictionProfile: typed API data. Unknown response fields are preserved."
-    age: float = Field(..., alias="age", repr=False)
+    age: int = Field(..., alias="age", repr=False)
     sex: Sex = Field(..., alias="sex", repr=False)
     height: Height = Field(..., alias="height", repr=False)
     weight: Weight = Field(..., alias="weight", repr=False)
@@ -379,7 +472,7 @@ class GlucosePredictionProfile(APIModel):
     health_conditions: list[MedicalCondition] | None = Field(default=None, alias="health_conditions", repr=False, description="Omit it (or send []) if none apply. Type 1 diabetes is not supported by the prediction model.")
 
 class GlucosePredictionProfileInput(TypedDict, total=False):
-    age: Required[float]
+    age: Required[int]
     sex: Required[SexInput]
     height: Required[Height | HeightInput]
     weight: Required[Weight | WeightInput]
@@ -388,7 +481,7 @@ class GlucosePredictionProfileInput(TypedDict, total=False):
 
 class Height(APIModel):
     "Height: typed API data. Unknown response fields are preserved."
-    value: float = Field(..., alias="value", repr=False)
+    value: float = Field(..., alias="value", repr=False, description="Accepted range depends on unit: 20–108 in, 50–275 cm.")
     unit: HeightUnit = Field(..., alias="unit", repr=False)
 
 class HeightInput(TypedDict, total=False):
@@ -402,20 +495,34 @@ class ListFoodLogsResponse(APIModel):
 class ListFoodLogsResponseInput(TypedDict, total=False):
     items: Required[Sequence[FoodLog | FoodLogInput]]
 
+class ListWaterLogsResponse(APIModel):
+    "ListWaterLogsResponse: typed API data. Unknown response fields are preserved."
+    items: list[DailyWaterTotal] = Field(..., alias="items", repr=False, description="One entry per local day with water logged, oldest first. Days with nothing logged are absent. An empty list is a valid result.")
+
+class ListWaterLogsResponseInput(TypedDict, total=False):
+    items: Required[Sequence[DailyWaterTotal | DailyWaterTotalInput]]
+
+class ListWeightLogsResponse(APIModel):
+    "ListWeightLogsResponse: typed API data. Unknown response fields are preserved."
+    items: list[DailyWeight] = Field(..., alias="items", repr=False, description="One entry per day that has a weight, oldest first. Days with no weight are absent. An empty list is a valid result.")
+
+class ListWeightLogsResponseInput(TypedDict, total=False):
+    items: Required[Sequence[DailyWeight | DailyWeightInput]]
+
 class LoggedFood(APIModel):
     "LoggedFood: typed API data. Unknown response fields are preserved."
-    food_id: str | None = Field(..., alias="food_id", repr=False, description="Food id from a search or food-analysis result. Null only when the upstream sent a food with no id.")
+    food_id: str = Field(..., alias="food_id", repr=False, description="Food id from a search or food-analysis result.")
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the upstream sent none.")
     brand_name: str | None = Field(..., alias="brand_name", repr=False, description="Null for generic (non-branded) foods.")
     image_url: str | None = Field(..., alias="image_url", repr=False)
     glycemic_index: float | None = Field(..., alias="glycemic_index", repr=False)
     glycemic_load: float | None = Field(..., alias="glycemic_load", repr=False)
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Scaled to the consumed quantity.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="How many of the serving below were consumed. Null only when the upstream sent no consumed quantity.")
-    serving: ServingDetails = Field(..., alias="serving", repr=False, description="The serving definition the quantity refers to.")
+    quantity: float | None = Field(..., alias="quantity", repr=False, description="Number of selected servings consumed. Consumed amount = food.quantity × food.serving.quantity, in food.serving.unit (4 × 0.5 cup = 2 cups). Nutrients are already scaled to this portion. Null when unavailable.")
+    serving: ServingSummary = Field(..., alias="serving", repr=False, description="The serving definition the quantity refers to.")
 
 class LoggedFoodInput(TypedDict, total=False):
-    food_id: Required[str | None]
+    food_id: Required[str]
     name: Required[str | None]
     brand_name: Required[str | None]
     image_url: Required[str | None]
@@ -423,16 +530,16 @@ class LoggedFoodInput(TypedDict, total=False):
     glycemic_load: Required[float | None]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
     quantity: Required[float | None]
-    serving: Required[ServingDetails | ServingDetailsInput]
+    serving: Required[ServingSummary | ServingSummaryInput]
 
 class NutrientAmount(APIModel):
     "NutrientAmount: typed API data. Unknown response fields are preserved."
     value: float = Field(..., alias="value", repr=False)
-    unit: str = Field(..., alias="unit", repr=False, description="Canonical across the API: g, mg, kcal, IU.")
+    unit: NutrientUnit = Field(..., alias="unit", repr=False)
 
 class NutrientAmountInput(TypedDict, total=False):
     value: Required[float]
-    unit: Required[str]
+    unit: Required[NutrientUnitInput]
 
 class NutritionFacts(APIModel):
     "NutritionFacts: typed API data. Unknown response fields are preserved."
@@ -511,7 +618,7 @@ class RestaurantInput(TypedDict, total=False):
 
 class RestaurantMenuItem(APIModel):
     "RestaurantMenuItem: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Food id of the dish — the same id `GET /v1.2/foods/{food_id}` and `POST /v1.2/food-logs` take. Null only when the menu source carries no id for the row.")
+    id: str = Field(..., alias="id", repr=False, description="Food id of the dish — the same id `GET /v1.2/foods/{food_id}` and `POST /v1.2/food-logs` take.")
     name: str | None = Field(..., alias="name", repr=False, description="Null only when the menu source has no name for the dish.")
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Per-serving nutrition in the shared nutrient vocabulary. Keys are omitted when the menu source has no value.")
     glycemic_index: float | None = Field(..., alias="glycemic_index", repr=False, description="Glycemic index; null when the source has none.")
@@ -519,7 +626,7 @@ class RestaurantMenuItem(APIModel):
     servings: list[ServingOption] = Field(..., alias="servings", repr=False, description="The serving the nutrition is given for. `GET /v1.2/foods/{food_id}` returns the complete list of servings.")
 
 class RestaurantMenuItemInput(TypedDict, total=False):
-    id: Required[str | None]
+    id: Required[str]
     name: Required[str | None]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
     glycemic_index: Required[float | None]
@@ -563,7 +670,7 @@ class RevokeClientTokensBodyInput(TypedDict, total=False):
 class ScanFoodPhotoBody(APIModel):
     "ScanFoodPhotoBody: typed API data. Unknown response fields are preserved."
     image: str = Field(..., alias="image", repr=False, description="The food photo — the food itself or a packaged product's label — as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Formats: JPG, PNG, WEBP, and non-animated GIF. Around 1,024 px on the shorter side is enough for reliable results (a recommendation, not a validation rule). A URL must be publicly fetchable server-side — hosts that block hotlinking or require a login cannot be read — and has no enforced size cap, though very large files slow the analysis and can time out. Base64 must be a complete data URI and fit the 5 MB request-body cap, so keep raw images under ~3.5 MB before encoding (base64 inflates by ~33%). Prefer the URL when the image is already hosted.")
-    reasoning: AnalysisReasoning | None = Field(default=None, alias="reasoning", repr=False, description="Controls analysis effort. Omit it or set `effort` to `none` to use the standard analyzer; `xhigh` uses the reasoning-based analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.")
+    reasoning: AnalysisReasoning | None = Field(default=None, alias="reasoning", repr=False, description="Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.")
 
 class ScanFoodPhotoBodyInput(TypedDict, total=False):
     image: Required[str]
@@ -590,22 +697,9 @@ class SearchRestaurantsResponse(APIModel):
 class SearchRestaurantsResponseInput(TypedDict, total=False):
     items: Required[Sequence[Restaurant | RestaurantInput]]
 
-class ServingDetails(APIModel):
-    "ServingDetails: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Null only when the upstream sent a serving with no id.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="How many units make up one of this serving, e.g. 1 for \"1 cup\". Null when the upstream reported none.")
-    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the upstream sent a serving with no unit.")
-    weight_grams: float | None = Field(..., alias="weight_grams", repr=False, description="Null when the upstream has no gram weight for this serving.")
-
-class ServingDetailsInput(TypedDict, total=False):
-    id: Required[str | None]
-    quantity: Required[float | None]
-    unit: Required[str | None]
-    weight_grams: Required[float | None]
-
 class ServingOption(APIModel):
     "ServingOption: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Opaque serving id; may look numeric but is always a string.")
+    id: str = Field(..., alias="id", repr=False, description="Opaque serving id; may look numeric but is always a string.")
     quantity: float | None = Field(..., alias="quantity", repr=False)
     unit: str | None = Field(..., alias="unit", repr=False)
     scaling_factor: float | None = Field(..., alias="scaling_factor", repr=False, description="Multiplier applied to the food's nutrition values for this serving.")
@@ -613,7 +707,7 @@ class ServingOption(APIModel):
     is_primary: bool | None = Field(..., alias="is_primary", repr=False, description="Whether this is the default serving for the food.")
 
 class ServingOptionInput(TypedDict, total=False):
-    id: Required[str | None]
+    id: Required[str]
     quantity: Required[float | None]
     unit: Required[str | None]
     scaling_factor: Required[float | None]
@@ -622,14 +716,16 @@ class ServingOptionInput(TypedDict, total=False):
 
 class ServingSummary(APIModel):
     "ServingSummary: typed API data. Unknown response fields are preserved."
-    id: str | None = Field(..., alias="id", repr=False, description="Null only when the producer sent a serving with no id.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="How much of `unit` this serving is; null when the producer reported none.")
+    id: str = Field(..., alias="id", repr=False, description="Catalog serving id. Pass it back as serving_id when logging this food.")
+    quantity: float = Field(..., alias="quantity", repr=False, description="Positive amount of unit represented by this serving definition. In food analysis and food logs this is one catalog serving: consumed amount = food.quantity × food.serving.quantity (4 × 0.5 cup = 2 cups). Food alternatives instead report their recommended portion amount here.")
     unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
+    weight_grams: float | None = Field(..., alias="weight_grams", repr=False, description="Weight in grams of this serving definition. For food analysis and food logs this is one catalog serving, not the consumed portion: consumed grams = food.quantity × food.serving.weight_grams. Null when unknown.")
 
 class ServingSummaryInput(TypedDict, total=False):
-    id: Required[str | None]
-    quantity: Required[float | None]
+    id: Required[str]
+    quantity: Required[float]
     unit: Required[str | None]
+    weight_grams: Required[float | None]
 
 class SuggestFoodAlternativesBody(APIModel):
     "SuggestFoodAlternativesBody: typed API data. Unknown response fields are preserved."
@@ -650,7 +746,7 @@ class SuggestFoodAlternativesResponseInput(TypedDict, total=False):
 class UpdateFoodLogBody(APIModel):
     "UpdateFoodLogBody: typed API data. Unknown response fields are preserved."
     foods: list[FoodLogInputFood] | None = Field(default=None, alias="foods", repr=False)
-    eaten_at: datetime | None = Field(default=None, alias="eaten_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.")
+    eaten_at: datetime | None = Field(default=None, alias="created_at", repr=False, description="When the meal was eaten — any ISO-8601 offset; stored and returned in UTC with milliseconds. Omit to leave it unchanged.")
     name: str | None = Field(default=None, alias="name", repr=False)
 
 class UpdateFoodLogBodyInput(TypedDict, total=False):
@@ -658,14 +754,52 @@ class UpdateFoodLogBodyInput(TypedDict, total=False):
     eaten_at: str | datetime
     name: str
 
+class Volume(APIModel):
+    "Volume: typed API data. Unknown response fields are preserved."
+    value: float = Field(..., alias="value", repr=False, description="Rounded to one decimal place.")
+    unit: VolumeUnit = Field(..., alias="unit", repr=False)
+
+class VolumeInput(TypedDict, total=False):
+    value: Required[float]
+    unit: Required[VolumeUnitInput]
+
+class WaterAmount(APIModel):
+    "WaterAmount: typed API data. Unknown response fields are preserved."
+    value: float = Field(..., alias="value", repr=False, description="Accepted range depends on unit: 1–811.5 fl_oz, 30–24000 ml, 0.1–101.4 cup.")
+    unit: VolumeUnit = Field(..., alias="unit", repr=False)
+
+class WaterAmountInput(TypedDict, total=False):
+    value: Required[float]
+    unit: Required[VolumeUnitInput]
+
+class WaterLog(APIModel):
+    "WaterLog: typed API data. Unknown response fields are preserved."
+    id: str = Field(..., alias="id", repr=False, description="Save this id to delete the log.")
+    amount: WaterAmount = Field(..., alias="amount", repr=False, description="The amount as logged, in the unit it was sent in.")
+    consumed_at: datetime = Field(..., alias="created_at", repr=False, description="When the water was consumed. UTC, with milliseconds.")
+
+class WaterLogInput(TypedDict, total=False):
+    id: Required[str]
+    amount: Required[WaterAmount | WaterAmountInput]
+    consumed_at: Required[str | datetime]
+
 class Weight(APIModel):
     "Weight: typed API data. Unknown response fields are preserved."
-    value: float = Field(..., alias="value", repr=False)
+    value: float = Field(..., alias="value", repr=False, description="Accepted range depends on unit: 2–1500 lb, 1–700 kg.")
     unit: WeightUnit = Field(..., alias="unit", repr=False)
 
 class WeightInput(TypedDict, total=False):
     value: Required[float]
     unit: Required[WeightUnitInput]
+
+class WeightLog(APIModel):
+    "WeightLog: typed API data. Unknown response fields are preserved."
+    weight: Weight = Field(..., alias="weight", repr=False, description="The weight as logged, in the unit it was sent in.")
+    measured_at: datetime = Field(..., alias="created_at", repr=False, description="When the weight was measured. UTC, with milliseconds.")
+
+class WeightLogInput(TypedDict, total=False):
+    weight: Required[Weight | WeightInput]
+    measured_at: Required[str | datetime]
 
 # Resolve forward references after every schema has been declared.
 AlternativeFood.model_rebuild()
@@ -676,9 +810,17 @@ ClientToken.model_rebuild()
 ClientTokenRevocationResult.model_rebuild()
 ConsumedHistoricalFood.model_rebuild()
 CorrectPhotoScanBody.model_rebuild()
+CorrectionAnalysis.model_rebuild()
+CorrectionDetection.model_rebuild()
+CorrectionFood.model_rebuild()
+CorrectionServing.model_rebuild()
 CreateClientTokenBody.model_rebuild()
 CreateFoodLogBody.model_rebuild()
+CreateWaterLogBody.model_rebuild()
+CreateWeightLogBody.model_rebuild()
 CreditBalance.model_rebuild()
+DailyWaterTotal.model_rebuild()
+DailyWeight.model_rebuild()
 DetectedFood.model_rebuild()
 ErrorResponse.model_rebuild()
 FoodDetection.model_rebuild()
@@ -699,6 +841,8 @@ GlucosePredictionPoint.model_rebuild()
 GlucosePredictionProfile.model_rebuild()
 Height.model_rebuild()
 ListFoodLogsResponse.model_rebuild()
+ListWaterLogsResponse.model_rebuild()
+ListWeightLogsResponse.model_rebuild()
 LoggedFood.model_rebuild()
 NutrientAmount.model_rebuild()
 NutritionFacts.model_rebuild()
@@ -711,10 +855,13 @@ ScanFoodPhotoBody.model_rebuild()
 SearchFoodsByNaturalLanguageBody.model_rebuild()
 SearchRestaurantMenuItemsResponse.model_rebuild()
 SearchRestaurantsResponse.model_rebuild()
-ServingDetails.model_rebuild()
 ServingOption.model_rebuild()
 ServingSummary.model_rebuild()
 SuggestFoodAlternativesBody.model_rebuild()
 SuggestFoodAlternativesResponse.model_rebuild()
 UpdateFoodLogBody.model_rebuild()
+Volume.model_rebuild()
+WaterAmount.model_rebuild()
+WaterLog.model_rebuild()
 Weight.model_rebuild()
+WeightLog.model_rebuild()

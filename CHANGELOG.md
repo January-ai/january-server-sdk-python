@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-09-22
+
+- Add water logs: `water_logs.create`, `water_logs.list` (daily totals in the
+  requested unit) and `water_logs.delete` (idempotent). Amounts are in `fl_oz`,
+  `cup` or `ml`.
+- Add weight logs: `weight_logs.create` and `weight_logs.list` (latest weight per day).
+- Add the `water_logs:read`, `water_logs:write`, `weight_logs:read` and
+  `weight_logs:write` client-token scopes.
+- Water and weight creation are never replayed after an ambiguous failure (a
+  timeout, lost response or 5xx reply), like food-log creation and token minting.
+  A 429 `rate_limited` reply recorded nothing, so it is retried within the limits.
+- Food, water and weight logs send and read their time as `created_at`, the name
+  the API now uses in requests and replies in place of `eaten_at`, `consumed_at`
+  and `measured_at`. The keyword arguments and model attributes keep their names
+  (`eaten_at`, `consumed_at` and `measured_at`), so no code changes are needed; a
+  model dumped with `by_alias=True` uses `created_at`. 0.1.0 still sends and
+  expects `eaten_at` for food logs.
+- A water amount must be within its unit's range (1–811.5 `fl_oz`, 0.1–101.4
+  `cup`, 30–24000 `ml`), a weight log within 10–1000 `lb` or 4.5–453.6 `kg`, a
+  glucose profile's weight within 2–1500 `lb` or 1–700 `kg` and its height within
+  20–108 `in` or 50–275 `cm`, and a food or serving quantity must be greater than
+  zero. These raise `JanuaryValidationError` before
+  any request.
+- `client_tokens.create`, `HttpClientTokenIssuer` and the `ClientScope` type accept
+  the new log scopes.
+- A correction input accepts `confidence=None`, which text analyses and corrected
+  results return.
+- `food_logs.update` rejects an empty update before sending it, and only sends the
+  fields you set.
+- `food_analysis.correct` sends a returned `FoodScan` back as the correction input
+  the API now documents (`CorrectionAnalysis`); a serving weight is optional there.
+- Logged foods carry the same `ServingSummary` as analysis results, including
+  `weight_grams`.
+- `AlternativeFood.id`, `ServingOption.id`, `RestaurantMenuItem.id` and
+  `LoggedFood.food_id` are always returned, so their type is `str` instead of
+  `str | None`. Food and serving IDs must be 1–10 digits without a leading zero;
+  other values raise `JanuaryValidationError` before any request.
+- Photo analysis uses the reasoning-based analyzer when `reasoning` is omitted, as
+  the API now defaults to it. Pass `reasoning={"effort": "none"}` for the standard
+  analyzer. The SDK sends `reasoning` only when you set it.
+- The `conflict` error code (409) is recognized and never retried.
+
 ## 0.1.0 - 2026-09-04
 
 Initial public release.

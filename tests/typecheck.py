@@ -29,7 +29,10 @@ def check_portion(food: models.FoodSearchItem, error: FoodPortionError) -> None:
 def check_sync(client: January) -> None:
     # Returned lists and native timestamps must work without casts in user code.
     scan = client.food_analysis.analyze_description(query="eggs")
-    assert_type(client.food_analysis.correct(analysis=scan, instruction="less"), models.FoodScan)
+    assert_type(
+        client.food_analysis.correct(analysis=scan, instruction="less"),
+        models.FoodScan,
+    )
     assert_type(
         client.food_logs.list(
             end_user_id="user",
@@ -63,6 +66,34 @@ def check_sync(client: January) -> None:
     )
     portion = FoodPortion.from_food(user.foods.get(food_id="42"))
     assert_type(user.food_logs.create(foods=[portion.selection]), models.FoodLog)
+
+
+def check_corrections_and_log_scopes(client: January) -> None:
+    # A text or corrected scan carries a null confidence; the correction input takes it back.
+    analysis: models.CorrectionAnalysisInput = {
+        "meal_name": None,
+        "detections": [
+            {
+                "confidence": None,
+                "food": {
+                    "name": "Eggs",
+                    "brand_name": None,
+                    "id": "12",
+                    "quantity": 2,
+                    "nutrients": {},
+                    "serving": {"id": "5", "quantity": 1, "unit": "large"},
+                },
+            }
+        ],
+    }
+    assert_type(
+        client.food_analysis.correct(analysis=analysis, instruction="less"), models.FoodScan
+    )
+    token = client.client_tokens.create(
+        end_user_id="user",
+        scopes=["water_logs:read", "water_logs:write", "weight_logs:read", "weight_logs:write"],
+    )
+    assert_type(token, ClientToken)
 
 
 async def check_async(client: AsyncJanuary) -> None:

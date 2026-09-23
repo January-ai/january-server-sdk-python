@@ -64,6 +64,37 @@ with January(max_retries=0) as client:
 FoodPortion is local and does not consume credits. The same utility works with
 foods returned by AsyncJanuary and does not mutate the source food.
 
+## Log water and weight alongside meals
+
+```python
+from datetime import datetime, timezone
+from pathlib import Path
+from dotenv import load_dotenv
+from januaryai import BadRequestError, January
+
+load_dotenv(Path.cwd() / ".env", override=False)
+with January(max_retries=0) as client:
+    user = client.for_user("your-authenticated-user", end_user_timezone="UTC")
+    try:
+        glass = user.water_logs.create(
+            amount={"value": 8, "unit": "fl_oz"},
+            consumed_at=datetime.now(timezone.utc),
+        )
+    except BadRequestError as error:
+        if error.code != "daily_water_limit_exceeded":
+            raise
+        glass = None  # The user already reached the daily cap.
+    user.weight_logs.create(weight={"value": 160, "unit": "lb"})
+    today = datetime.now(timezone.utc).date().isoformat()
+    water = user.water_logs.list(start_date=today, end_date=today, timezone="UTC", unit="fl_oz")
+    weights = user.weight_logs.list(start_date=today, end_date=today, timezone="UTC")
+    if glass is not None:
+        user.water_logs.delete(log_id=glass.id)  # Undo; safe to repeat.
+```
+
+Daily totals come back in the unit you ask for, rounded to one decimal place.
+Logging a second weight on the same day replaces what that day shows.
+
 ## Concurrent photos and async applications
 
 [concurrent.py](../examples/analysis/concurrent.py) is a complete asyncio example
