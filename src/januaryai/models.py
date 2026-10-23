@@ -219,7 +219,7 @@ class CreateWeightLogBodyInput(TypedDict, total=False):
 class CreditBalance(APIModel):
     "CreditBalance: typed API data. Unknown response fields are preserved."
     plan: CreditPlan = Field(..., alias="plan", repr=False)
-    period_start: _date = Field(..., alias="period_start", repr=False, description="First day of the current billing period (UTC), inclusive.")
+    period_start: _date = Field(..., alias="period_start", repr=False, description="First day of the current billing period (UTC), inclusive. In the month of a plan change that starts no new billing period (a move to Free, say), the day of the change, when the allowance restarted.")
     period_end: _date = Field(..., alias="period_end", repr=False, description="Last day of the current billing period (UTC), inclusive.")
     resets_at: datetime = Field(..., alias="resets_at", repr=False, description="When the billing period ends and the next begins: `used_credits` and the free-call count return to 0 and the request allowance reopens.")
     included_credits: int | None = Field(..., alias="included_credits", repr=False, description="Credits included in the plan for this period, or `null` when the plan has no ceiling.")
@@ -273,7 +273,7 @@ class DetectedFoodInput(TypedDict, total=False):
 class ErrorResponse(APIModel):
     "ErrorResponse: typed API data. Unknown response fields are preserved."
     message: str = Field(..., alias="message", repr=False, description="A developer-facing explanation of what went wrong and how to fix it.")
-    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409), `payload_too_large` (413), `rate_limited` (429), `request_limit_exceeded` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`conflict` (409) means the request conflicts with an existing resource, such as an Idempotency-Key reused with different files. Resolve the conflict before retrying.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nFour more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called an operation that documents the January-End-User-ID header without sending it), `date_range_too_large` (400 — a date range past the operation's documented maximum or lookback), `daily_water_limit_exceeded` (400 — a water log that would take the end user's total for its day past 24 L; not retryable), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. Three more the status code alone gets wrong. **Two 429s must never be retried**, because both reopen only when your billing period resets: `credit_limit_exceeded` (the credit allowance for the period) and `request_limit_exceeded` (the request allowance for the period). A client that backs off on every 429 will spin until then; neither sends `Retry-After`, and the message names the reset instant — `GET /v1.2/credits` returns it as the resets_at field. `rate_limited` is the 429 that *is* worth retrying: a per-endpoint limit, or the rolling 24-hour burst guard over the request allowance, so its window is at most a day. And `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
+    code: str = Field(..., alias="code", repr=False, description="A stable machine-readable identifier for the class of failure — build retry logic on this, never on message wording.\n\nAny request, each with the status it usually accompanies: `invalid_request` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409), `payload_too_large` (413), `rate_limited` (429), `credit_limit_exceeded` (429), `internal_error` (500), `not_implemented` (501), `upstream_error` (502), `service_unavailable` (503), `upstream_timeout` (504). Those pairings are the common case, not a guarantee: a status we do not map falls back to `invalid_request` below 500 and `internal_error` at or above it, so an internal service answering 422 reaches you with that status and `code: invalid_request`. Branch on the code first and treat the status as the fallback, exactly as for a code you do not recognise.\n\n`conflict` (409) means the request conflicts with an existing resource, such as an Idempotency-Key reused with different files, or a stored food log that references a food or serving that is no longer available. Resolve the conflict before retrying.\n\n`cancelled` (499) means the client disconnected before completion. The closed connection may prevent delivery of the error body.\n\nClient tokens add six an API key never produces: `token_expired`, `token_invalid`, `token_revoked` (401), and `client_token_not_allowed`, `scope_insufficient`, `end_user_id_mismatch` (403). Each response documents its own.\n\nFour more are specific to individual endpoints: `end_user_id_required` (400 — an sk- key called an operation that documents the January-End-User-ID header without sending it), `date_range_too_large` (400 — a date range past the operation's documented maximum or lookback), `daily_water_limit_exceeded` (400 — a water log that would take the end user's total for its day past 24 L; not retryable), and `client_token_revocation_incomplete` (503 — a revocation call that only stopped part of its batch; the same request is safe to repeat).\n\n`POST /v1.2/food-analysis/image` adds four 400s about the image itself: `image_unreachable` (the URL could not be fetched), `image_corrupt` (the file could not be decoded), `image_format_unsupported` and `image_invalid_base64`. Each is fixed by the caller; the same image fails the same way again.\n\nRetry only `rate_limited`, `internal_error`, `upstream_error`, `service_unavailable`, `upstream_timeout` and `client_token_revocation_incomplete`, with backoff — `not_implemented` is permanent until the feature ships, so its 5xx status is not a reason to retry it. `credit_limit_exceeded` is the 429 that must not be retried: the credit allowance returns when the billing period resets. It sends no `Retry-After`; `GET /v1.2/credits` reports resets_at. `rate_limited` means a rolling abuse window was reached and is worth retrying with backoff. `Retry-After` is sent when that window's TTL is known. `token_expired` is refreshed, not retried — mint a new token, then retry once.\n\nNew codes may be added over time; treat an unknown code according to its HTTP status class.")
 
 class ErrorResponseInput(TypedDict, total=False):
     message: Required[str]
@@ -428,7 +428,7 @@ class FoodSuggestionInput(TypedDict, total=False):
 
 class GetRestaurantMenuItemsResponse(APIModel):
     "GetRestaurantMenuItemsResponse: typed API data. Unknown response fields are preserved."
-    items: list[RestaurantMenuItem] = Field(..., alias="items", repr=False, description="The menu items, by name. Empty when the restaurant has no menu on record.")
+    items: list[RestaurantMenuItem] = Field(..., alias="items", repr=False, description="The menu items, by name. Empty when the restaurant has no menu on record or nothing on it matches `query`.")
 
 class GetRestaurantMenuItemsResponseInput(TypedDict, total=False):
     items: Required[Sequence[RestaurantMenuItem | RestaurantMenuItemInput]]
@@ -469,7 +469,7 @@ class GlucosePredictionProfile(APIModel):
     height: Height = Field(..., alias="height", repr=False)
     weight: Weight = Field(..., alias="weight", repr=False)
     activity_level: ActivityLevel | None = Field(default=None, alias="activity_level", repr=False)
-    health_conditions: list[MedicalCondition] | None = Field(default=None, alias="health_conditions", repr=False, description="Omit it (or send []) if none apply. Type 1 diabetes is not supported by the prediction model.")
+    health_conditions: list[MedicalCondition] | None = Field(default=None, alias="health_conditions", repr=False, description="Send [] (or omit it) when none of these apply; the prediction is then for a person without these conditions. Type 1 diabetes is not supported by the prediction model.")
 
 class GlucosePredictionProfileInput(TypedDict, total=False):
     age: Required[int]
@@ -518,8 +518,8 @@ class LoggedFood(APIModel):
     glycemic_index: float | None = Field(..., alias="glycemic_index", repr=False)
     glycemic_load: float | None = Field(..., alias="glycemic_load", repr=False)
     nutrients: NutritionFacts = Field(..., alias="nutrients", repr=False, description="Scaled to the consumed quantity.")
-    quantity: float | None = Field(..., alias="quantity", repr=False, description="Number of selected servings consumed. Consumed amount = food.quantity × food.serving.quantity, in food.serving.unit (4 × 0.5 cup = 2 cups). Nutrients are already scaled to this portion. Null when unavailable.")
-    serving: ServingSummary = Field(..., alias="serving", repr=False, description="The serving definition the quantity refers to.")
+    quantity: float | None = Field(..., alias="quantity", repr=False, description="Number of selected servings consumed. Consumed amount = food.quantity × food.serving.quantity, in food.serving.unit (4 × 0.5 cup = 2 cups), when food.serving.quantity is known. Nutrients are already scaled to this portion. Null when unavailable.")
+    serving: LoggedServing = Field(..., alias="serving", repr=False, description="The serving definition the quantity refers to.")
 
 class LoggedFoodInput(TypedDict, total=False):
     food_id: Required[str]
@@ -530,7 +530,20 @@ class LoggedFoodInput(TypedDict, total=False):
     glycemic_load: Required[float | None]
     nutrients: Required[NutritionFacts | NutritionFactsInput]
     quantity: Required[float | None]
-    serving: Required[ServingSummary | ServingSummaryInput]
+    serving: Required[LoggedServing | LoggedServingInput]
+
+class LoggedServing(APIModel):
+    "LoggedServing: typed API data. Unknown response fields are preserved."
+    id: str = Field(..., alias="id", repr=False, description="Catalog serving id. Pass it back as serving_id when logging this food.")
+    unit: str | None = Field(..., alias="unit", repr=False, description="Null only when the producer sent a serving with no unit.")
+    weight_grams: float | None = Field(..., alias="weight_grams", repr=False, description="Weight in grams of this serving definition. For food analysis and food logs this is one catalog serving, not the consumed portion: consumed grams = food.quantity × food.serving.weight_grams. Null when unknown.")
+    quantity: float | None = Field(..., alias="quantity", repr=False, description="Positive amount of unit represented by this catalog serving: consumed amount = food.quantity × food.serving.quantity (4 × 0.5 cup = 2 cups). Null when the catalog has no usable size for this serving; the consumed amount is then unknown, though nutrients are still scaled to food.quantity.")
+
+class LoggedServingInput(TypedDict, total=False):
+    id: Required[str]
+    unit: Required[str | None]
+    weight_grams: Required[float | None]
+    quantity: Required[float | None]
 
 class NutrientAmount(APIModel):
     "NutrientAmount: typed API data. Unknown response fields are preserved."
@@ -671,10 +684,12 @@ class ScanFoodPhotoBody(APIModel):
     "ScanFoodPhotoBody: typed API data. Unknown response fields are preserved."
     image: str = Field(..., alias="image", repr=False, description="The food photo — the food itself or a packaged product's label — as an http(s) URL or a base64 data URI (data:image/jpeg;base64,…). Formats: JPG, PNG, WEBP, and non-animated GIF. Around 1,024 px on the shorter side is enough for reliable results (a recommendation, not a validation rule). A URL must be publicly fetchable server-side — hosts that block hotlinking or require a login cannot be read — and has no enforced size cap, though very large files slow the analysis and can time out. Base64 must be a complete data URI and fit the 5 MB request-body cap, so keep raw images under ~3.5 MB before encoding (base64 inflates by ~33%). Prefer the URL when the image is already hosted.")
     reasoning: AnalysisReasoning | None = Field(default=None, alias="reasoning", repr=False, description="Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.")
+    context: str | None = Field(default=None, alias="context", repr=False, description="**Beta.** A note about the meal from the person or app that took the photo: details the image may not show, such as how it was cooked, oils and sauces, hidden ingredients, how many items, or the brand or restaurant. The analysis takes it into account alongside the photo.")
 
 class ScanFoodPhotoBodyInput(TypedDict, total=False):
     image: Required[str]
     reasoning: AnalysisReasoning | AnalysisReasoningInput
+    context: str | None
 
 class SearchFoodsByNaturalLanguageBody(APIModel):
     "SearchFoodsByNaturalLanguageBody: typed API data. Unknown response fields are preserved."
@@ -844,6 +859,7 @@ ListFoodLogsResponse.model_rebuild()
 ListWaterLogsResponse.model_rebuild()
 ListWeightLogsResponse.model_rebuild()
 LoggedFood.model_rebuild()
+LoggedServing.model_rebuild()
 NutrientAmount.model_rebuild()
 NutritionFacts.model_rebuild()
 PredictGlucoseBody.model_rebuild()

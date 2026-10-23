@@ -94,15 +94,16 @@ class SyncRestaurants(SyncResource):
 
     def get_menu_items(
         self, *,
+        query: str | UnsetType = UNSET,
         limit: int | UnsetType = UNSET,
         offset: int | UnsetType = UNSET,
         restaurant_id: str,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> GetRestaurantMenuItemsResponse:
-        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    query: Keep only the dishes whose name contains this text, ignoring case. Omitted or blank, the whole menu is listed; `limit` and `offset` then page the matching items.\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(GetRestaurantMenuItemsResponse, self._transport.request(
-            "getRestaurantMenuItems", {"limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
+            "getRestaurantMenuItems", {"query": query, "limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout, cancel_event,
         ))
 
     def search_menu_items(
@@ -126,13 +127,14 @@ class SyncFoodAnalysis(SyncResource):
         self, *,
         image: ImageInput,
         reasoning: AnalysisReasoning | AnalysisReasoningInput | UnsetType = UNSET,
+        context: str | None | UnsetType = UNSET,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
         cancel_event: Event | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    context: **Beta.** A note about the meal from the person or app that took the photo: details the image may not show, such as how it was cooked, oils and sauces, hidden ingredients, how many items, or the brand or restaurant. The analysis takes it into account alongside the photo.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n    cancel_event: Optional threading.Event to cancel before sending or during reads/retry waits.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, self._transport.request(
-            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
+            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "context": context, "preprocess": preprocess}, FoodScan, self._context, timeout, cancel_event,
         ))
 
     def analyze_description(
@@ -475,14 +477,15 @@ class AsyncRestaurants(AsyncResource):
 
     async def get_menu_items(
         self, *,
+        query: str | UnsetType = UNSET,
         limit: int | UnsetType = UNSET,
         offset: int | UnsetType = UNSET,
         restaurant_id: str,
         timeout: float | httpx.Timeout | None = None,
     ) -> GetRestaurantMenuItemsResponse:
-        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Load a page of menu items by restaurant id, without a text search.\n\nArgs:\n    query: Keep only the dishes whose name contains this text, ignoring case. Omitted or blank, the whole menu is listed; `limit` and `offset` then page the matching items.\n    limit: Maximum number of menu items to return. Raise it, or page with `offset`, for a long menu.\n    offset: Number of menu items to skip, for paging: a page shorter than `limit` is the last one.\n    restaurant_id: Restaurant id from a `GET /v1.2/restaurants` result.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: GetRestaurantMenuItemsResponse.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(GetRestaurantMenuItemsResponse, await self._transport.request(
-            "getRestaurantMenuItems", {"limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout,
+            "getRestaurantMenuItems", {"query": query, "limit": limit, "offset": offset, "restaurant_id": restaurant_id}, GetRestaurantMenuItemsResponse, self._context, timeout,
         ))
 
     async def search_menu_items(
@@ -505,12 +508,13 @@ class AsyncFoodAnalysis(AsyncResource):
         self, *,
         image: ImageInput,
         reasoning: AnalysisReasoning | AnalysisReasoningInput | UnsetType = UNSET,
+        context: str | None | UnsetType = UNSET,
         preprocess: bool = True,
         timeout: float | httpx.Timeout | None = None,
     ) -> FoodScan:
-        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
+        "Analyze a food photo and return detected foods and meal nutrition.\n\nArgs:\n    image: URL/data URI, trusted local path, bytes, binary file, or Pillow image. Never use an untrusted string as a local path.\n    reasoning: Controls analysis effort. Omit it or set `effort` to `xhigh` to use the reasoning-based analyzer; `none` uses the standard analyzer. Both modes return the same FoodAnalysisResult shape and use the same rate-limit bucket and credit cost.\n    context: **Beta.** A note about the meal from the person or app that took the photo: details the image may not show, such as how it was cooked, oils and sauces, hidden ingredients, how many items, or the brand or restaurant. The analysis takes it into account alongside the photo.\n    preprocess: Rotate, resize and encode local images. URLs/data URIs are unchanged.\n    timeout: Seconds or httpx.Timeout. Bounds the whole request/retry budget; phase limits must be finite.\n\nReturns: FoodScan.\n\nRaises: JanuaryValidationError for invalid requests; JanuaryAPIError subclasses for API failures; JanuaryConnectionError/JanuaryTimeoutError for transport failures.\nJanuaryResponseError reports invalid success responses separately from API-status failures. JanuaryError also catches closed-client and redirect failures.\nImage preparation may raise ValueError, TypeError, or FileNotFoundError before HTTP.\nRetries follow max_retries and the stable API error code. Credit exhaustion is never retried.\nA retried successful analysis/read may consume another credit."
         return cast(FoodScan, await self._transport.request(
-            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "preprocess": preprocess}, FoodScan, self._context, timeout,
+            "scanFoodPhoto", {"image": image, "reasoning": reasoning, "context": context, "preprocess": preprocess}, FoodScan, self._context, timeout,
         ))
 
     async def analyze_description(
